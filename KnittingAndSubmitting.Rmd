@@ -1,0 +1,237 @@
+---
+title: "From Excel to Insights: Data Import and Analysis"
+author: "Lin Xiao"
+output: html_document
+date: "2025-09-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+```
+
+## Importing and Playing with Excel File in R
+
+Analyzing Employee Survey Data: Import, Summary, and Visualization in R
+
+# Load data
+
+```{r load_data}
+# read csv file
+library(readr)
+Typical_Employee_Survey_Data_CSV <-
+  read_csv("Typical_Employee_Survey_Data.csv")
+
+# read xlsx file and set names for colomns
+library(readxl)
+Typical_Employee_Survey_Data <- read_excel("Typical_Employee_Survey_Data.xlsx", col_names = FALSE)
+
+mydf <- Typical_Employee_Survey_Data
+ncol(mydf)
+colnames(mydf) <- c( "Age","Gender","JobSatisfaction", "ImportantJobcharacteristics", "EmployedYear","PromotedRate","DecisionAuthority","BudgetDecisionAuthority","OrganizationPride", "JobTurnDown", "WorkplaceRelationship")
+```
+
+# Explore dataframe
+
+```{r explore_data}
+names(mydf)
+head(mydf)
+tail(mydf)
+dim(mydf)
+str(mydf)
+colSums(is.na(mydf))
+summary(mydf)
+boxplot(mydf, las=2, main="Boxplots for All Numeric Columns")
+
+# Column
+mydf$ImportantJobcharacteristics
+mydf$DecisionAuthority
+mydf[c("Age")]
+mydf[1:2]
+mydf[5,]
+mydf[10, 4:8]
+```
+
+## Transfer and Convert
+
+```{r Convert_factor}
+#Age to Age group
+class(mydf$Age)
+boxplot(mydf$Age, main="Boxplot of Age")
+
+mydf$AgeGroup <- ifelse(mydf$Age >= 20 & mydf$Age <= 30, "20-30",
+                  ifelse(mydf$Age >= 31 & mydf$Age <= 40, "31-40",
+                  ifelse(mydf$Age >= 41 & mydf$Age <= 50, "41-50",
+                  ifelse(mydf$Age >= 51 & mydf$Age <= 60, "51-60", "Over 60"))))
+
+# convert age group to factor
+mydf$AgeGroup <- factor(mydf$AgeGroup,
+                        levels = c("20-30", "31-40", "41-50", "51-60", "Over 60"))
+
+table(mydf$AgeGroup)
+
+barplot(table(mydf$AgeGroup),
+        main = "Age Distribution by Group",
+        xlab = "Age Group", ylab = "Count",
+        col = "skyblue")
+
+
+# convert Gender to factor :M, F
+class(mydf$Gender)
+mydf$Gender <- factor(mydf$Gender,
+                      levels = c(1, 2),
+                      labels = c("M", "F"))
+class(mydf$Gender)
+tbGender <- table(mydf$Gender)
+lbls <- paste(names(tbGender), round(prop.table(table(mydf$Gender))*100), "%")
+pie(tbGender, labels = lbls, col = rainbow(2), main = "Gender Pie Chart")
+
+
+table(mydf$AgeGroup, mydf$Gender)
+
+table(mydf$EmployedYear)
+
+# convert Budget Decision Authority to YES, NO
+class(mydf$BudgetDecisionAuthority)
+mydf$BudgetDecisionAuthority <- factor(mydf$BudgetDecisionAuthority,
+                      levels = c(1, 2),
+                      labels = c("YES", "NO"))
+class(mydf$BudgetDecisionAuthority)
+table(mydf$BudgetDecisionAuthority)
+
+```
+
+## Visual for column
+
+```{r Visual-column}
+# Job satisfaction pie plot
+tbJobSatisfaction <- table(mydf$JobSatisfaction)
+names(tbJobSatisfaction) <- c("Very Satisfied", 
+                         "Moderately Satisfied", 
+                         "A Little Dissatisfied", 
+                         "Very Dissatisfied")
+pct <- round(tbJobSatisfaction / sum(tbJobSatisfaction) * 100)
+lbls <- paste(names(tbJobSatisfaction), pct, "%")
+
+pie(tbJobSatisfaction,
+    main = "Job Satisfaction Distribution",
+    col = rainbow(length(tbJobSatisfaction)), 
+    labels = lbls)
+
+# Important Job Characteristics
+tbImJobchar <- table(mydf$ImportantJobcharacteristics)
+barplot(tbImJobchar,
+        main = "Important Job Characteristics",
+        ylab = "Count",
+        col = "blue",
+        names.arg = c("High Income",
+                      "No Danger of Being Fired",
+                      "Flexible Hours",
+                      "Opportunity for Advancement",
+                      "Enjoying the Work"),
+        las = 2)
+
+# Promoted Likely
+tbPro <- table(mydf$PromotedRate)
+barplot(tbPro,
+        ylab ="Numbers",
+        main = "Promoted Likely",
+        col = "purple",
+        names.arg = c("Very Likely","Likely","Not Sure", "UnLikely", "Very UnLikely"),
+        las = 3,
+        cex.names = 0.8)
+
+```
+
+# Create a function to plot column
+
+```{r test}
+plot_column <- function(data, coltype = "H", varname = deparse(substitute(data)), labelname = varname) {
+   # Plot type
+  if (coltype == "H") {
+    hist(data,
+         main = paste("Histogram of", varname),
+         xlab = varname,
+         ylab = "Frequency",
+         col = "skyblue",
+         border = "white")
+  } else if (coltype == "B") {
+    counts <- table(data)
+    barplot(counts,
+            main = paste("Barplot of", varname),
+            xlab = varname, 
+            ylab = "Count",
+            names.arg = labelname,
+            las = 1,
+            cex.names = 0.5,
+            col = rainbow(length(counts)))
+  } else if (coltype == "P") {
+    con <- table(data)
+    lblsdata <- paste(labelname, round(prop.table(con)*100), "%")
+    pie(con,
+        main = paste("Pie Chart of", varname),
+        labels = lblsdata,
+        col = rainbow((length(con)))
+        )
+  } else {
+    message("Unsupported data")
+  }
+}
+
+
+# plot columns
+plot_column(mydf$EmployedYear, "H", "Employed year")
+
+lnames <- c("Always", "Much of the Time", "Sometimes", "Never")
+plot_column(mydf$DecisionAuthority, "B", "DecisionAuthority", lnames)
+
+lnames <- c("Very Proud","Somewhat Proud","Indifferent","Not At All Proud")
+plot_column(mydf$OrganizationPride, "P", "Proud rate for organization", lnames)
+
+table(mydf$WorkplaceRelationship)
+lnames <- c("Very Good", "Good", "So so", "Bad")
+plot_column(mydf$WorkplaceRelationship, "B", "Relations between colleagues", lnames)
+
+```
+
+## Relationship Plot
+
+```{r plot}
+# Most Important job characteristics vs Employed years
+tbl <- table(mydf$ImportantJobcharacteristics,mydf$EmployedYear)
+barplot(tbl, 
+        beside=FALSE, 
+        col=rainbow(nrow(tbl)),
+        main="Stacked Barplot: Job Characteristics by Work Years",
+        xlab="Employed Years", 
+        ylab="Count")
+
+legend("topright", 
+       legend = c("High Income",
+                   "No Danger of Being Fired",
+                   "Flexible Hours",
+                   "Opportunity for Advancement",
+                   "Enjoying the Work"),
+       col = rainbow(5), 
+       pch = 19, 
+       bty = "n",
+       cex = 0.8) 
+
+# Age Group vs Job Satisfaction
+barplot(table(mydf$AgeGroup, mydf$JobSatisfaction),
+        beside = FALSE, col = rainbow(5),
+        main = "Job Satisfaction by Age Group",
+        legend = TRUE, xlab = "Job satisfied by Age group", ylab = "Count")
+
+#Employed Year Job satisfaction by gender
+plot(mydf$EmployedYear,
+     mydf$JobSatisfaction,
+     col = ifelse(mydf$Gender == "M", "blue", "red"),
+     pch = 19,
+     xlab = "Work years",
+     ylab = "Job Satisfaction(1-4",
+     main = "Scatter Plot: Employed years vs Job Satisfaction by Gender")
+
+legend("topright", legend = c("Male","Female"),
+       col = c("blue","red"), pch = 19)
+
+```
