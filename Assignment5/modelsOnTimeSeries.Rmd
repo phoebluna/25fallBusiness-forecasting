@@ -1,0 +1,207 @@
+---
+title: "Forecasting models on time series"
+author: "Lin Xiao"
+date: "2025-10-06"
+output: html_document
+---
+
+
+## Running forecasting models on time series  
+
+### 1. Introduction
+
+The dataset **arrivals** (from the `fpp2` package) contains quarterly international visitor arrivals to Australia from major source countries: *Japan, New Zealand, the UK,* and *the US* (1981–2012).  
+This project compares several forecasting models using the **Japan** series and identifies the best-performing model based on forecast accuracy.
+
+### 2. Data Overview
+Load dataset, and then check the dataset attributes which shows its time span, frequency, dimensions and class information.
+
+#### * Load data
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+library(fpp2)
+library(TTR)
+```
+
+#### * Data exploration
+```{r dataOverview}
+# Display the metadata (attributes) of the 'arrivals' dataset including its time span, frequency, dimensions, and class information
+attributes(arrivals)
+
+# plot the time series for Japan
+# This displays the quarterly number of tourist arrivals from Japan between 1981 and 2012
+# The plot visually identify:
+# * Trend: steady growth from around 1980 to 1996, followed by a slight decline afterward.
+# * Seasonality: clear repeating peaks and troughs each year, indicating strong quarterly seasonality.
+plot(arrivals[,"Japan"])
+
+# The ACF shows presence of trend, and seasonal patterns appear as spikes at seasonal lags
+acf(arrivals[, "Japan"])
+```
+
+### 3. Models
+
+Including Mean, Naive, Random walk, seasonal Naive, moving average, Simple Exponential Smoothing, Holt’s Trend and Holt winter models
+
+```{r models, fig.width=10, fig.height=6, fig.align='center'}
+# Mean
+mean_forecast <- meanf(arrivals[,"Japan"],8)
+plot(mean_forecast)
+
+# Naive
+naive_forecast <- naive(arrivals[,"Japan"],8)
+plot(naive_forecast)
+
+# Random Walk
+rwf_forecast <- rwf(arrivals[,"Japan"],8, drift=TRUE)
+plot(rwf_forecast)
+
+# Seasonal Naive
+snaive_forecast <- snaive(arrivals[,"Japan"],8)
+plot(snaive_forecast)
+
+# Moving Averages
+MA4_forecast <- ma(arrivals[,"Japan"],order=4)
+plot(MA4_forecast)
+forecast_MA4 <- forecast(MA4_forecast)
+plot(forecast_MA4)
+
+
+# Simple Exponential Smoothing
+ses_forecast <- ses(arrivals[,"Japan"], h=8)
+ses_forecast$model
+plot(ses_forecast)
+
+# Holt’s Trend
+holt_forecast <- holt(arrivals[,"Japan"], h=8)
+plot(holt_forecast)
+
+# HoltWinters
+HW_forecast<- HoltWinters(arrivals[,"Japan"])
+forecast_HW <- forecast(HW_forecast, h=8)
+plot(HW_forecast)
+plot(forecast_HW)
+
+SSE_Simple <- HoltWinters(arrivals[,"Japan"],beta=FALSE,gamma=FALSE)
+SSE_forecast <- forecast(SSE_Simple, h = 8)
+plot(SSE_Simple)
+
+```
+
+
+### Decomposition 
+```{r decomposition-model}
+#decomposition
+stl_decomp <- stl(arrivals[,"Japan"],s.window ="periodic")
+plot(stl_decomp)
+attributes(stl_decomp)
+
+# seasonal adjustment
+seasadj(stl_decomp)
+# Plot a line on the graph
+plot(arrivals[,"Japan"])
+lines(seasadj(stl_decomp), col="Red")
+# Default period forecast
+f_stl <- forecast(stl_decomp)
+# you can pass the # of period
+f_stl <- forecast(stl_decomp,h=8)
+plot(f_stl)
+
+
+decomp_arr <- decompose(arrivals[,"Japan"])
+plot(decomp_arr)
+attributes(decomp_arr)
+seasadj(decomp_arr)
+```
+
+
+### 4. Model Interpretation and Comparison
+
+#### Plot: Time Series and Different Forecasts in One Chart
+
+```{r plotAndAccuracy, fig.width=10, fig.height=6, fig.align='center'}
+
+autoplot(arrivals[,"Japan"], series = "Original") +
+  autolayer(mean_forecast,   series="Mean", PI=FALSE) +
+  autolayer(naive_forecast,  series="Naive", PI=FALSE) +
+  autolayer(rwf_forecast,    series="Random Walk", PI=FALSE) +
+  autolayer(snaive_forecast, series="Seasonal Naive", PI=FALSE) +
+  autolayer(forecast_MA4,   series="Moving average", PI=FALSE) +
+  autolayer(ses_forecast,    series="Simple Exponential Smoothing", PI=FALSE) +
+  autolayer(holt_forecast,   series="Holt Trend", PI=FALSE) +
+  autolayer(forecast_HW,     series="Holt Winter", PI=FALSE) +
+  ggtitle("Forecast Comparison: Mean vs Naive vs Random Walk vs Moving average vs Seasonal Naive vs SES vs Holt trend vs Holt Winter") +
+  ylab("Tourist Arrivals") + 
+  xlab("Year") +
+  scale_colour_manual(values = c(
+    "Original" = "black",
+    "Mean" = "skyblue",
+    "Naive" = "steelblue",
+    "Random Walk" = "purple",
+    "Moving average" = "brown",
+    "Seasonal Naive" = "orange",
+    "Simple Exponential Smoothing" = "green",
+    "Holt Trend" = "navy",
+    "Holt Winter" = "yellow"
+  )) +
+  guides(colour = guide_legend(title = "Models")) +
+  theme_minimal(base_size = 10)
+```
+
+#### The plot above compares multiple forecasting models for Japan’s quarterly tourist arrivals from 1981 to 2012.
+
+- **Mean Model** provides a simple baseline forecast, assuming that future values will remain constant at the historical average level (around 122 thousand).  
+  This model ignores both trend and seasonality, serving as a reference point for other models.
+
+- **Naive Model** uses the most recent observation as the forecast for all future periods (around 101 thousand).  
+  It assumes no structural change and is typically effective when the time series has strong persistence without clear trends or seasonality.
+
+- **Random Walk with Drift** extends the Naive model by including a drift term that represents a steady upward or downward trend over time.  
+  This allows the forecasts to move linearly in the direction of the recent trend, although it still cannot capture seasonal fluctuations.
+
+- **Seasonal Naive Model** captures recurring seasonal patterns by using the value from the same season in the previous year as the forecast.  
+  It reproduces seasonal oscillations but does not account for long-term growth or decline trends.
+
+- **Simple Exponential Smoothing (SES)** produces a nearly flat line by assigning exponentially decreasing weights to older observations.  
+  It adapts to short-term level changes but ignores both the seasonal and long-term downward movements seen in the Japan arrivals data.
+
+- **Holt’s Trend Method** extends SES by incorporating a trend component, allowing forecasts to follow gradual increases or decreases over time.  
+  In this dataset, the forecast line shows a mild upward slope, indicating sensitivity to recent changes in trend.
+
+- **Holt–Winters Model** further adds a seasonal component, making it effective for series with both trend and seasonality—such as quarterly tourist arrivals.  
+  The model captures the cyclical oscillations and downward trend observed in the later years of the data.
+
+> Both the Holt–Winters and Seasonal Naive models produce forecasts with seasonal oscillations.  
+> However, while the Seasonal Naive model simply repeats the previous year’s seasonal pattern,  
+> the Holt–Winters model captures both **trend** and **seasonality**, making it more adaptive to changing seasonal behavior.
+
+### 5. Accuracy Comparison
+
+**Root Mean Squared Error** (RMSE) is selected as the primary accuracy metric to evaluate and compare all forecasting models.
+
+> RMSE is particularly suitable for time series forecasting because it penalizes larger errors more heavily, making it sensitive to model precision and stability
+
+```{r accuracyPick}
+# Create accuracy comparison table
+model_comparison <- rbind(
+  Mean = accuracy(mean_forecast),
+  Naive = accuracy(naive_forecast),
+  RandomWalk = accuracy(rwf_forecast),
+  MovingAv = accuracy(forecast_MA4),
+  SeasonalNaive = accuracy(snaive_forecast),
+  sesM = accuracy(ses_forecast),
+  holtF = accuracy(holt_forecast),
+  HW = accuracy(forecast_HW),
+  SSE = accuracy(SSE_forecast),
+  stl = accuracy(f_stl)
+)
+
+rownames(model_comparison) <- c("Mean Forecast", "Naive", "Random Walk", "Moving Average", "Seasonal Naive","SES", "Holt","Holt Winter", "SSE", "Decomposition")
+round(model_comparison[, c("RMSE","MAE","MAPE","MASE")], 3)
+```
+
+#### Based on the RMSE comparison from the accuracy table:
+- **Holt-Winters** Model achieves the lowest RMSE (13.29) among all models, indicating the most accurate forecasts.
+- **Holt Trend** and **Seasonal Naïve** models also perform well but have slightly higher RMSE values, showing that they capture trend or seasonality partially.
+- Simpler models such as Mean, Naïve, and SES produce higher RMSE, as they **do not** fully represent both trend and seasonal variations.
+- The *Moving Average model*, although showing very low RMSE, is excluded from model ranking since its accuracy reflects in-sample smoothing rather than out-of-sample forecasting performance.
