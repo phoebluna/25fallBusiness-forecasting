@@ -473,9 +473,26 @@ In this project, MASE was selected as the primary accuracy measure, as it provid
 ---
 
 ### 4. Summary Interpretation
+#### **Overall**
 - Over the entire period (1981 – 2012), the tourist arrivals time series shows a clear upward trend, reflecting long-term growth in international travel to the U.S.
 - The decomposition analysis reveals strong, stable seasonality — arrivals peak around Q3–Q4 (summer and holiday seasons) and drop in Q1 (winter months).
 - The seasonally adjusted series continues to trend upward, confirming steady underlying growth despite short-term cyclical dips.
+
+#### Based on the selected models and forecasts:
+- **Next Year** (1-year horizon): The forecast suggests a slight increase in tourist arrivals, continuing the upward trajectory observed historically.
+- **Next Two Years**: The trend is expected to continue increasing gradually, though at a slower and more stabilized rate, indicating a mature and cyclic tourism market.
+Seasonal effects are expected to persist, with similar quarterly highs and lows repeating in the future.
+
+#### **Ranking** of Forecasting Methods (Based on Historical Accuracy)
+1. Moving Average: Lowest overall errors (RMSE = 0.966, MAPE = 0.922%), indicating best short-term predictive accuracy.
+
+2. Holt-Winters:Effectively models both trend and seasonality; slightly higher error due to model complexity.
+
+3. Simple Exponential Smoothing (SES):Captures short-term level changes but lacks seasonality adjustment.
+
+4. Naïve Model:Baseline for comparison; highest error across all metrics.
+
+
 
 
 
