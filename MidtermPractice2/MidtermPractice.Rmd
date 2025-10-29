@@ -18,9 +18,9 @@ library(fpp2)
 TRANSIT <- read_csv("TRANSIT.csv") 
 spec(TRANSIT)
 Transit_Raw <- TRANSIT$TRANSIT
-Transit_ts <- ts(Transit_Raw, frequency = 12, start = c(2000,1)) 
-head(Transit_ts)
-tail(Transit_ts)
+Transit_ts_ed <- ts(Transit_Raw, frequency = 12, start = c(2000,1)) 
+head(Transit_ts_ed)
+tail(Transit_ts_ed)
 ```
 
 ## 2. Data overview
@@ -28,7 +28,7 @@ tail(Transit_ts)
 ### 2.1 Data Plot
 
 ```{r data-plot}
-plot(Transit_ts, ylab= "Transit")
+plot(Transit_ts_ed, ylab= "Transit")
 ```
 
 #### Summarry of Data Plot
@@ -37,6 +37,18 @@ plot(Transit_ts, ylab= "Transit")
 -After mid-2020, the series exhibits a gradual recovery trend, though ridership has not yet returned to pre-pandemic levels by the end of the observed period.
 - The seasonal variation that was evident before 2020 appears to weaken after the drop, possibly indicating changes in travel behavior or commuting patterns post-pandemic.
 
+#### Because the recent data differ from historical trends and show a sharp decline, data before 2021 were removed to keep only the more stable recent period.. 
+
+```{r remove-data}
+Transit_ts <- window(Transit_ts_ed, start = c(2021, 5))
+
+plot(Transit_ts)
+```
+
+> The time series plot shows a gradual upward trend in U.S. public transit ridership from 2021 to mid-2023, recovering steadily after a previous drop.
+> There are also visible seasonal peaks, indicating recurring periods of higher ridership (e.g., around mid-year).
+> Overall, the data show both trend and seasonal variation.
+
 ### 2.2 Acf plot
 
 ```{r data_Acf_plot}
@@ -44,12 +56,9 @@ Acf(Transit_ts)
 
 ```
 
-#### Summary of Acf plot observation
-The ACF plot indicates that the transit time series is strongly **autocorrelated, non-stationary, and seasonal**.
-- The first few lags (1–12) show high correlation values (ACF ≈ 0.9 → 0.6), indicating that each month’s ridership is highly related to recent months — a strong sign of trend and persistence in the data.
--	The slow, gradual decay of the autocorrelation function suggests the series is non-stationary, meaning it likely contains a **trend component**.
-- The small repeating pattern visible roughly every **12 lags** (one year) indicates the presence of seasonality — consistent with monthly data that cycles annually.
-- There are no sharp drops or oscillations crossing zero quickly, which rules out randomness; instead, the series exhibits long-term dependency and structured behavior.
+> The ACF plot shows significant positive autocorrelation for the first few lags, which gradually decays to zero around lag 9 and turns slightly negative afterward.
+> This pattern confirms that the series has short-term persistence (values close in time are correlated) and mild seasonality, consistent with the observed trend in the time-series plot.
+> Hence, Acf plots indicate same result with time series plot the data contain a moderate upward trend and seasonal cycles.
 
 ### 2.3 Central Tendency
 
@@ -57,7 +66,7 @@ The ACF plot indicates that the transit time series is strongly **autocorrelated
 # display summary statistics
 summary(Transit_ts)
 boxplot(Transit_ts,
-        main = "Public Transit Raidership of the US from Jan 2000 to Jul 2023",
+        main = "Public Transit Raidership of the US from Mar 2021 to Jul 2023",
         col = "skyblue")
 ```
 
@@ -67,17 +76,15 @@ The summary statistics are as follows:
 
 | Statistic | Value |
 |------------|-------|
-| Minimum    | 171450 |
-| 1st Quartile (Q1) | 772502 |
-| Median     | 824766 |
-| Mean       | 779435 |
-| 3rd Quartile (Q3) | 866164 |
-| Maximum    | 993437 |
+| Minimum    | 374081 |
+| 1st Quartile (Q1) | 457292 |
+| Median     | 512795 |
+| Mean       | 501943 |
+| 3rd Quartile (Q3) | 541132 |
+| Maximum    | 609180 |
 
--	The median ridership is around the middle of the interquartile range, suggesting that overall ridership was relatively stable for much of the period before 2020.
-- The interquartile range (IQR) is fairly narrow, indicating moderate variability in ridership across most months.
-- However, the box plot shows numerous outliers on the lower end, representing exceptionally low ridership values — these correspond to the sharp drop during the COVID-19 pandemic (around 2020).
--	There are no extreme upper outliers, implying that unusually high ridership months were rare and that most values stayed close to the upper whisker.
+-	The box plot shows that U.S. public transit ridership between March 2021 and July 2023 is relatively stable, with a median around 520,000.
+Most values fall within the 450,000–570,000 range, indicating moderate fluctuations and no extreme outliers.
 
 ## 3 Accuracy Evaluation Criteria
 
@@ -99,8 +106,8 @@ lines(transit_sajs, col="red")
 ```
 > The time series is strongly seasonal, as shown in the decomposition plot where regular peaks and troughs repeat consistently each year. The seasonal component displays a clear monthly pattern, with higher values during mid-year months—likely corresponding to summer seasons or holiday travel periods—and lower ridership during winter months.
 > The decomposition is additive, since the magnitude of seasonal fluctuations remains roughly constant across time and does not scale with the overall level of the series.
-> The trend component shows a gradual increase from 2000 to around 2019, followed by a sharp drop in 2020, which coincides with the COVID-19 pandemic and its effect on public transportation usage. After 2020, the trend partially recovers but has not yet reached pre-pandemic levels.
-> After removing seasonality, the adjusted series clearly highlights the long-term downward shift caused by the pandemic.
+> The trend component shows a gradual increase from 2021.
+> The seasonally adjusted series (red line) confirms a general upward trend with slight decline toward mid-2023, suggesting stabilization after a period of growth.
 
 ### 3.2 Naive Method
 ```{r naive}
@@ -122,8 +129,8 @@ hist(naive_residual, main = "Histogram of Naïve Forecast Residuals",
      xlab ="Residuals", col = "skyblue")
 ```
 
-> The residuals are centered near zero, but the distribution isn't symetric, showing a mild skewness toward the negative side, meaning that the model tends to produce slightly larger underestimations in some periods.
-> This plot indicates it fails to adapt to abrupt changes or seasonality in the data.
+> Most residuals are near zero → good overall fit.
+> A long right tail → model sometimes underestimates large ridership spikes.
 
 ```{r naive_residuals_fitted}
 plot(as.numeric(naive_forecast$fitted), as.numeric(naive_forecast$residuals),
@@ -132,8 +139,7 @@ plot(as.numeric(naive_forecast$fitted), as.numeric(naive_forecast$residuals),
 abline(h = 0, col = "red")
 ```
 
-> Although the residuals are centered around zero, the distribution is not completely symmetric, indicating that the Naïve model does not fully capture the trend or seasonality.
-> A noticeable clustering appears at higher fitted values (around 800,000–1,000,000), suggesting that the Naïve model systematically underperforms in certain value ranges — likely during periods of higher ridership.
+> The residuals are generally centered around zero with no obvious pattern, suggesting that the Naïve model captures the basic structure of the data, though a few outliers and mild heteroscedasticity indicate limited accuracy during certain periods.
 
 ```{r naive_residual_ts}
 plot(as.numeric(Transit_ts),as.numeric(naive_forecast$residuals),
@@ -143,15 +149,15 @@ plot(as.numeric(Transit_ts),as.numeric(naive_forecast$residuals),
 abline(h = 0, col = "red")
 ```
 
-> The “Actual vs Residuals” plot conveys a similar interpretation as the “Fitted vs Residuals” plot — Residuals are roughly centered around zero but not randomly distributed — they form visible clusters, particularly at higher actual ridership values (above 800,000).
-> This indicates that the Naïve model struggles to capture variation at higher levels of the series, likely due to the presence of strong seasonality and abrupt structural changes (e.g., pandemic-related drops).
+> Residuals are randomly distributed around zero, indicating no strong bias, though higher actual ridership values show larger residuals.
+> This pattern suggests that while the Naïve model captures the overall direction of the data, it struggles to adapt to large fluctuations during peak periods.
 
 ```{r naive_residual_acf}
 Acf(naive_residual, main="ACF of Residuals - Naïve Forecast")
 ```
 
->The ACF plot of residuals shows significant autocorrelation at several lags — especially around seasonal intervals (e.g., lag 12 for monthly data).
-This means that the residuals are not white noise, indicating that there is still a systematic pattern remaining in the data.
+> All autocorrelation spikes fall within the blue confidence bounds, which means that the residuals are not significantly autocorrelated.
+> This indicates that the residuals behave like white noise, suggesting that the Naïve model has captured most of the predictable structure in the time series.
 
 #### 3.2.2 Naive Accuracy and forecast Plot
 
@@ -214,21 +220,17 @@ ss_forecast$model
 ```
 
 #### Model Parameters
-- **Alpha (α) = 0.8374**  
-  - Indicates a moderate-to-high level of responsiveness — the model quickly adapts to recent changes but still retains some smoothing from historical trends.
-  - This makes it suitable for data with short-term fluctuations but without a strong trend or seasonality.
+- **Alpha (α) = 0.9273**  
+  - The smoothing parameter is very high (close to 1), meaning the model gives much more weight to recent observations and quickly adapts to recent changes.
+  - This suggests that the data may change rapidly or have short-term fluctuations.
 
-- **Initial State (l₀) = 732001.6666**  
+- **Initial State (l₀) = 376776.1973**  
   - This represents the model’s *starting level* estimate at the beginning of the time series.  
   - It acts as the baseline from which the exponential smoothing process begins.  
 
-- **Sigma (σ) = 732001.6666**  
+- **Sigma (σ) = 37902.97**  
   - Measures the standard deviation of forecast errors, reflecting the average variability in residuals.
   - The smaller the sigma, the more consistent and accurate the model fit; a higher sigma indicates higher variability and uncertainty.
-
-> since α is close to 1, it gives greater importance to recent changes, making it responsive to post-2020 recovery trends in public transit ridership.
-
-
 
 
 #### 3.3.1 Residuals
@@ -241,7 +243,7 @@ plot(ss_residual, main = "Residuals of Simple Smoothing Forecast", ylab = "resid
 abline(h=0, col="red")
 ```
 
-> The residuals fluctuate around zero, indicating no systematic bias in the model. However, the repeating peaks and troughs suggest that some seasonal pattern remains in the residuals — meaning the Simple Exponential Smoothing model has not captured the seasonality or abust in the data.
+> The residuals fluctuate around zero, indicating no systematic bias in the model. However, the repeating peaks and troughs suggest that some seasonal pattern remains in the residuals — meaning the Simple Exponential Smoothing model has not captured the seasonality in the data.
 
 ```{r ss-residuals-hist}
 # histogram 
@@ -260,8 +262,7 @@ plot(as.numeric(ss_forecast$fitted), as.numeric(ss_forecast$residuals),
 abline(h=0, col="red")
 ```
 
-> Although the residuals are centered around zero, the distribution is not completely symmetric, indicating that the Naïve model does not fully capture the trend or seasonality.
-> A noticeable clustering appears at higher fitted values (around 800,000–1,000,000), meaning it tends to underestimate the actual values when transit usage increases significantly.
+> The residuals are randomly scattered around zero, indicating no systematic bias, but larger deviations at some fitted values suggest the model underestimates variability in some periods.
 
 
 ```{r ss-residuals-ts}
@@ -273,8 +274,7 @@ plot(as.numeric(Transit_ts), as.numeric(ss_forecast$residuals),
 abline(h = 0, col = "red")
 ```
 
-> The clustered residuals at high actual values (around 800,000–1,000,000) indicate that the SES model failed to capture sudden changes in ridership.
-> This suggests the model lacks responsiveness to sharp shifts or trend components in the data.
+> Residuals are centered around zero but show greater variability at higher actual values, suggesting underfitting during high-demand periods.
 
 
 ```{r ss-residual-acf}
@@ -282,8 +282,8 @@ abline(h = 0, col = "red")
 Acf(ss_residual, main="ACF of Residuals - SS Forecast")
 ```
 
-> The ACF plot shows significant autocorrelation at seasonal lags, indicating the SES model fails to fully remove seasonal effects.
-> This means the residuals are not white noise, and the model still misses some underlying patterns in the data.
+> All autocorrelation spikes fall within the blue confidence bounds, which means that the residuals are not significantly autocorrelated.
+> This indicates that the residuals behave like white noise, suggesting that the Naïve model has captured most of the predictable structure in the time series.
 
 #### 3.3.2 Accuracy & Forecast plot
 ```{r ss-accuracy}
@@ -293,14 +293,14 @@ plot(ss_forecast)
 ```
 
 ##### This flat forecast reflects the model’s level-only nature — SES does not capture trend or seasonality, so it assumes future values will stay close to the recent average level.
-> According to the forecast table, the predicted ridership remains constant at around 539,578 for all future months.
+> According to the forecast table, the predicted ridership remains constant at around 535,334 for all future months.
 > The SES (Simple Exponential Smoothing) model has
-  - RMSE = 55,127.84
-	- MAE = 40,313.36
-	- MAPE = 6.03%, and
-	- MASE = 0.71.
+  - RMSE = 36,472.15
+	- MAE = 29,877.77
+	- MAPE = 5.93%
+	- MASE = 0.35
 
-> These indicate that the model performs moderately well, maintaining prediction errors around 6% on average — a reasonable level of accuracy for a non-trend, non-seasonal model.
+> These results suggest that the SES model performs moderately well, maintaining forecast errors within roughly 6% on average, which is acceptable for a dataset with noticeable fluctuations but no clear trend or seasonality.
 
 
 ### 3.4 Holt-Winter
@@ -311,8 +311,7 @@ forecast_hw <- forecast(transit_hw, h = 12)
 transit_hw$model
 ```
 
-> The Holt-Winters additive model assigns nearly full weight to the latest observations (α ≈ 1), while giving minimal weight to trend and seasonal adjustments (β, γ ≈ 0).
-This suggests the model heavily depends on recent data but only weakly adapts to long-term trend or seasonality.
+> The Holt-Winters additive model captures a mild upward trend and moderate seasonality, but with nearly zero α and β, it updates very slowly, relying mostly on the initial state rather than recent data.
 
 #### 3.4.1 Residual Analysis
 ```{r hw-residual}
@@ -323,7 +322,10 @@ plot(hw_residual, main = "Residuals from Holt Winter Model", ylab="Residuals", x
 abline(h=0, col="red")
 ```
 
-> The residuals fluctuate randomly around zero, with no obvious long-term pattern. However, a sharp negative spike around 2020 indicates a sudden event that the model failed to capture.
+> During the early part of the time series (around 2021 to early 2022), the residuals stay close to zero with relatively small fluctuations, indicating that the model fitted the data well during this stable period.
+> However, starting from around March 2022, the residuals exhibit several large peaks and troughs, showing greater volatility and alternating positive/negative deviations.
+
+> The model fits well in early periods but fails to track the increased volatility after 2022, indicating limited adaptability to changing seasonal dynamics.
 
 
 ```{r hw-residual-his}
@@ -331,7 +333,8 @@ abline(h=0, col="red")
 hist(hw_residual, main = "Histogram of Holt Winter model Residual", xlab="Residuals", col="lightblue", border="white")
 ```
 
-> The histgram shows residuals are centered near zero but slightly skewed, showing an asymmetric distribution. Though, residuals on the very negative site suggests that errors are not perfectly normal, implying some systematic bias remains.
+> The residuals are centered near zero with a roughly symmetric distribution, showing that the Holt-Winters model fits the data reasonably well without major bias.
+
 
 ```{r hw-residual-fr}
 # fitted value vs residuals
@@ -341,7 +344,7 @@ plot(as.numeric(fitted(forecast_hw)), as.numeric(hw_residual),
 abline(h=0, col="red")
 ```
 
-> Residuals vs fitted cluster tightly near zero for mid-range fitted values but show greater dispersion at higher values. This indicates the model performs well overall but underfits when ridership levels are high.
+> The residuals cluster near zero with a few mild outliers, suggesting good overall fit and no major heteroscedasticity, though occasional extreme deviations remain.
 
 ```{r hw-residual-re}
 # real values vs residuals
@@ -352,31 +355,31 @@ plot(as.numeric(Transit_ts), as.numeric(hw_residual),
 abline(h = 0, col = "red")
 ```
 
-> Real values Residuals are fairly balanced across most actual values but show concentration at high ridership periods, and the model may not fully adapt to peak demand variations.
+> Most residuals stay near zero, showing good model fit, but a few large positive residuals at high actual values suggest minor underestimation during peak periods.
 
 ```{r hw-residual-acf}
 #ACF plot of residuals
 Acf(hw_residual, main="ACF of Residuals - Holt Winter Forecast")
 ```
 
-> The ACF plot shows no significant autocorrelation at any lag, as all bars fall within confidence bounds. This indicates that residuals approximate white noise — the Holt-Winters model has effectively captured most data patterns.
+> The residuals show no significant autocorrelation, suggesting that the Holt-Winters model has effectively captured the systematic structure in the series.
 
-#### Overall, the residuals suggest that the Holt-Winters model captures most of the information in the time series; however, some unexplained variations remain in the residuals, such as abrupt changes around 2020.
 
 #### 3.4.2 Accuracy & forecast plot
+
 ```{r hw-accuracy}
 accuracy(forecast_hw)
 forecast_hw
 plot(forecast_hw)
 ```
 
-> The Holt-Winters model shows the best accuracy among all models tested, with an RMSE of 40,313, MAPE of 4.1%, and MASE of 0.45 — all lower than the previous Naïve and Simple Smoothing models.
+> The Holt-Winters model shows the accuracy, with an RMSE of 40,313, MAPE of 4.1%, and MASE of 0.45
 
-> This indicates a strong fit and reliable short-term forecasting performance.
+> This indicates that the model fits the data well and provides reliable short-term forecasts, as the residuals behave approximately like white noise.
 
-> The forecast for August 2024 (one year ahead) is approximately 579,743 passengers, with an 80% confidence interval between 411,000 and 748,000.
+> The forecast for Jul 2024 (one year ahead) is approximately 646,940 passengers, with an 80% confidence interval between 604,000 and 690,000.
 
-The Holt-Winters model achieves the highest forecasting accuracy (MAPE ≈ 4%), predicting the time series will reach about 580,000 in one year, with moderate uncertainty in the forecast range.
+The Holt-Winters model achieves the highest forecasting accuracy (MAPE ≈ 3%), predicting the time series will reach about 670,000 in one year, with moderate uncertainty in the forecast range.
 
 ## 3.5 Accuracy summary
 
@@ -396,9 +399,9 @@ round(model_comparison[, c("RMSE","MAE","MAPE","MASE")], 3)
 Choosing **RMSE** as the primary accuracy measure because it penalizes larger errors more heavily, making it useful for identifying models that produce consistent and stable forecasts without large deviations.
 
 Best and Worst Forecast Methods (Based on RMSE)
-	- Best: **Moving Average** (RMSE = 15,972.93)
+	- Best: **Moving Average** (RMSE = 7,789.591)
     This model achieved the lowest RMSE, indicating it provides the most accurate and stable forecasts among all tested models.
-	-	Worst: **Naïve** (RMSE = 55,803.60)
+	-	Worst: **Naïve** (RMSE = 37,238.927)
    The Naïve model performed worst because it simply repeats the last observed value and fails to capture underlying trends or seasonal variations.
 
 ##### Overall: The Moving Average model demonstrates the highest forecasting accuracy under the RMSE criterion, while the Naïve model performs the poorest due to its inability to model time-dependent structure in the data.
@@ -407,4 +410,4 @@ Best and Worst Forecast Methods (Based on RMSE)
 
 ##### The U.S. public transit ridership time series **from 2000 to 2023** shows a stable seasonal pattern with a clear **long-term upward trend** until 2019, followed by a **sharp decline around 2020** due to the COVID-19 pandemic. After this drop, the series exhibits a **gradual recovery trend** but has not yet returned to pre-2020 levels.
 
-##### Based on the forecasting models—particularly the Holt-Winters and Moving Average models—the ridership is expected to **continue increasing** moderately over the next year, reaching around 580,000–590,000 riders. Over the next two years, the series is likely to keep **rising slowly**, suggesting a continued post-pandemic recovery but still below the historical peak levels observed before 2020.
+##### Based on the forecasting models — particularly the Holt-Winters additive and Moving Average models — transit ridership is projected to continue its moderate **upward trend over the next year**, reaching approximately 660,000 to 680,000 riders by mid-2024. The 95% confidence interval ranges roughly between 540,000 and 740,000, indicating moderate forecast uncertainty. Over the **next two years**, the ridership is expected to **gradually increase**, suggesting a steady post-pandemic recovery, though the levels remain below pre-2020 historical peaks.
