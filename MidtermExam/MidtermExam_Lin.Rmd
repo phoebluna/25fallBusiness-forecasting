@@ -492,7 +492,7 @@ The Moving Average model achieves the lowest error values across all metrics (RM
 
 **Based on the selected models and forecasts:**
 - **Next Year**: Car sales are likely to increase slightly or remain steady in the next year.
-- **Next Two Years**: , car sales will maintain a stable upward trend over the following two years, consistent with previous seasonal behavior.
+- **Next Two Years**: car sales will maintain a stable upward trend over the following two years, consistent with previous seasonal behavior.
 
 **Ranking of Forecasting methods**
 1st – Moving Average: Best accuracy (lowest MAPE).
