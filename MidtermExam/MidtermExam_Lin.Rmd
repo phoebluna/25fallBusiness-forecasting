@@ -1,0 +1,432 @@
+---
+title: "MidtermPractice"
+author: "Lin Xiao"
+date: "Nov 10, 2025"
+output: html_document
+---
+
+## 1. Import Data
+
+### Data Description
+
+
+```{r ImportData}
+library(readr)
+library(fpp2)
+library(TTR)
+data_csv <- read_csv("")
+head(data_csv)
+
+spec(data_csv)
+Raw_data <- data_csv$
+
+ts <- ts(Raw_data, frequency = 12, start = c(2000,1)) 
+head(ts)
+tail(ts)
+```
+
+## 2. Data Overview
+
+### 2.1 Time Series Plot
+```{r timeSeriesPlot}
+plot(ts)
+```
+
+### 2.2 Summary of time series plot Observations
+
+
+### 2.3 Remove data plot and ACF plot 
+
+```{r acfPlot}
+ts_data <- window(ts, start = c(1996,1))
+
+plot(ts_data)
+
+Acf(ts_data)
+```
+
+### 2.4 Summary of ACF Plot Observations
+
+The **Autocorrelation Function (ACF)** plot for the Japan tourist arrivals time series shows the following characteristics:
+
+- **Strong positive autocorrelation at small lags**, gradually decreasing as lag increases.  
+  This pattern confirms the **presence of a long-term trend** in the data — consecutive observations are highly correlated.  
+- **Repeating spikes at lag multiples** indicate a **seasonal component** with a quarterly frequency.  
+  This aligns with the dataset’s quarterly nature and the seasonal peaks observed in the time series plot.  
+
+Overall, the ACF plot supports the earlier findings that the data exhibits both **trend** and **seasonality**
+
+### 2.5 Central Tendency
+
+```{r centralTendency}
+# Display summary statistics
+summary(ts_data)
+
+# Create a box plot for visualizing distribution
+boxplot(ts_data,
+        main = "",
+        ylab = "",
+        col = "lightblue",
+        border = "darkblue")
+```
+
+### 2.6 Summary of Statistics and Box Plot Observations
+
+
+## 3. Accuracy Evaluation Criteria
+
+For this dataset, MAPE (Mean Absolute Percentage Error) is selected as the primary accuracy metric.
+Since the goal is to forecast future tourist arrivals and communicate performance in interpretable terms, MAPE provides a clear percentage-based measure of average prediction error.
+The Japan tourist arrivals data consist of positive and stable values, making MAPE appropriate and reliable.
+
+In addition, Root Mean Squared Error (RMSE) is reported to capture the absolute magnitude of forecast deviations and to identify models that better reflect the overall variability in tourist arrivals.
+
+## 4. Models
+
+
+### 4.1 Decomposition
+
+```{r decomposition}
+#decomposition
+stl_decomp <- stl(ts_data, s.window = "periodic")
+plot(stl_decomp)
+attributes(stl_decomp)
+
+```
+
+- The seasonal component shows a **clear and stable quarterly pattern** throughout the entire period, confirming consistent seasonality in Japan’s tourist arrivals.
+
+- The **amplitude of seasonal fluctuations** remains relatively constant over time, supporting the use of an additive decomposition model rather than multiplicative.
+
+> This pattern reflects an overall downward trend in inbound tourism after an initial rise, while maintaining a consistent seasonal rhythm.
+
+```{r decomposition-plot}
+# seasonal adjustment
+seasadj(stl_decomp)
+# Plot a line on the graph
+plot(ts_data)
+lines(seasadj(stl_decomp), col="Red")
+```
+
+> The seasonally adjusted series (red line) smooths out the periodic ups and downs seen in the original data, confirming that the time series exhibits strong and consistent seasonal fluctuations that significantly affect the short-term values of tourist arrivals.
+
+
+### 4.2 Naive Model
+
+```{r Naive-model}
+# Model output
+arrival_naive <- naive(ts_data,4)
+plot(arrival_naive)
+```
+
+- The naïve model simply uses the last observed value of the time series as the forecast for all future periods.
+- The shaded region represents the forecast intervals, showing increasing uncertainty over time.
+
+
+#### 4.2.1 Residual Analysis
+
+
+```{r naive-residual}
+arrival_nv_residual <- residuals(arrival_naive)
+plot(arrival_nv_residual, main="Residuals from Naïve Forecast", ylab="Residuals", xlab = "Year")
+abline(h=0, col="red")
+```
+
+
+
+```{r naive-residual_histogram}
+hist(arrival_nv_residual, main="Histogram of Naïve Forecast Residuals",
+     xlab="Residuals", col="lightblue", border="white")
+```
+
+
+
+
+```{r naive-residual-vs-fitted}
+arrival_nv_fitted <- fitted(arrival_naive)
+
+plot(as.numeric(arrival_nv_fitted), as.numeric(arrival_nv_residual),
+     main = "Residuals vs Fitted (Naïve Model)",
+     xlab = "fitted values", ylab = "Residuals")
+abline(h = 0, col = "red")
+```
+
+
+```{r naive-actual-vs-residuals}
+plot(as.numeric(ts_data),as.numeric(arrival_nv_residual),
+     main = "Actual Values vs Residuals (Naïve Model)",
+     xlab = "Actual Values", ylab = "Residuals",
+     type = "p", pch = 19, col = "darkblue", cex= 0.8)
+abline(h = 0, col = "red")
+```
+
+
+
+```{r naive-acf}
+Acf(arrival_nv_residual, main="ACF of Residuals - Naïve Forecast")
+```
+
+
+
+#### 4.2.2 Accuracy & Conclusion
+```{r naive-accuracy}
+accuracy(arrival_naive)
+arrival_naive$mean
+autoplot(arrival_naive) +
+  ggtitle("") +
+  ylab("") +
+  xlab("Year") +
+  theme_minimal()
+```
+	
+ **Accuracy**
+
+
+ **Interpretation**
+ 
+
+ **Conclusion**
+The Naïve forecast provides a simple benchmark model with easy interpretation but limited predictive capability. It serves as a baseline.
+
+### 4.3 Moving Averages
+
+```{r MA-model}
+# Compute moving averages of different orders
+MA3_forecast <- ma(ts_data, order = 3)
+MA6_forecast <- ma(ts_data, order = 6)
+MA9_forecast <- ma(ts_data, order = 9)
+
+# Plot original time series
+plot(ts_data, main = "Simple Moving Averages (Orders 3, 6, 9)",
+     ylab = "Tourist Arrivals (Thousands)", xlab = "Year", col = "black")
+
+# Add the three moving averages
+lines(MA3_forecast, col = "red", lwd = 2)
+lines(MA6_forecast, col = "blue", lwd = 2)
+lines(MA9_forecast, col = "green", lwd = 2)
+
+# Forecast next 4 quarters using order 6 (bonus)
+fit_ma6 <- auto.arima(na.omit(MA6_forecast))
+forecast_ma6 <- forecast(fit_ma6, h = 4)
+lines(forecast_ma6$mean, col = "purple", lwd = 2)
+
+legend("bottomleft",
+       legend = c("Original", "MA(3)", "MA(6)", "MA(9)", "Forecast MA(6)"),
+       col = c("black", "red", "blue", "green", "purple"),
+       lwd = 2, bty = "n")
+```
+
+**Observations:**
+- As the moving average order increases, the series becomes progressively smoother.  
+- The **MA(3)** line (red) still follows most of the short-term fluctuations.  
+- The **MA(6)** line (blue) reduces seasonal noise and captures medium-term trends better.  
+- The **MA(9)** line (green) is the smoothest, showing the long-term movement but lagging behind actual changes.  
+- Using MA(6), the forecast for the next 4 quarters predicts stable arrivals with mild variations.
+
+Overall, increasing the order of the moving average reduces short-term noise but delays response to sudden changes in the data.
+
+### 4.3 Simple Smoothing
+```{r simple-smooting-model}
+ss_arrival <- ses(ts_data, h = 4)
+plot(ss_arrival)
+ss_arrival$model
+```
+
+**Model Parameters**
+- **Alpha (α) = 0.28** 
+
+- **The initial level (≈204.5)**  
+
+- **The estimated sigma of 25.6** 
+
+Overall, 
+
+#### 4.3.1 Residual Analysis
+
+```{r SS-residual}
+ssrs_arrival <- residuals(ss_arrival)
+plot(ssrs_arrival, main="Residuals from Simple Smoothing Forecast", ylab="Residuals", xlab = "Year")
+abline(h=0, col="red")
+```
+
+
+
+```{r SS-residual-histogram}
+hist(ssrs_arrival, main = "Histogram of SS model Residual", xlab="Residuals", col="lightblue", border="white")
+```
+
+**Observations:**
+
+
+```{r SS-residual-vs-fitted}
+ssarrival_fitted <- fitted(ss_arrival)
+
+plot(as.numeric(ssarrival_fitted), as.numeric(ssrs_arrival),
+     main="Fitted Values vs Residuals (SS Model)",
+     xlab="Fitted Values", ylab="Residuals")
+abline(h=0, col="red")
+```
+
+**Observations:**
+
+
+```{r SS-actual-vs-residuals}
+plot(as.numeric(arrivals_ts), as.numeric(ssrs_arrival),
+     main = "Actual Values vs Residuals (SS Model)",
+     xlab = "Actual Values", ylab = "Residuals",
+     type = "p", pch = 19, col = "darkblue", cex= 0.8)
+abline(h = 0, col = "red")
+```
+
+
+
+
+```{r ss-acf}
+Acf(ssrs_arrival, main="ACF of Residuals - SS Forecast")
+```
+
+>
+
+#### 4.3.2 Accuracy & summary
+
+```{r ss-accuracy}
+accuracy(ss_arrival)
+ss_arrival
+plot(ss_arrival)
+```
+
+
+
+
+### 4.4 Holt-Winters
+
+#### 4.4.1 Holt Winters Model perform
+```{r holt-winter-model}
+hw_forecast <- hw(ts_data)
+forecast_hw <- forecast(hw_forecast, h = 4)
+forecast_hw$model
+```
+
+	
+
+#### 4.4.2 Residual Analysis — Holt–Winters Model
+
+```{r residual-analysis-HW}
+hw_residual <- residuals(forecast_hw)
+
+#plot residual
+plot(hw_residual, main = "Residuals from Holt Winter Model", ylab="Residuals", xlab = "Year")
+abline(h=0, col="red")
+```
+
+
+	
+
+```{r hw-residual-his}
+#histogram
+hist(hw_residual, main = "Histogram of Holt Winter model Residual", xlab="Residuals", col="lightblue", border="white")
+```
+
+
+
+
+```{r hw-residual-fitted}
+# fitted fitted vs residuals
+plot(as.numeric(fitted(forecast_hw)), as.numeric(hw_residual),
+     main="Fitted fitted vs Residuals (Holt Winter Model)",
+     xlab="Fitted Values", ylab="Residuals")
+abline(h=0, col="red")
+```
+
+
+
+```{r hw-values-residuals}
+# real values vs residuals
+plot(as.numeric(arrivals_ts), as.numeric(hw_residual),
+     main = "Actual Values vs Residuals (Holt Winter Model)",
+     xlab = "Actual Values", ylab = "Residuals",
+     type = "p", pch = 19, col = "darkblue", cex= 0.8)
+abline(h = 0, col = "red")
+```
+
+
+
+
+```{r hw-residual-ACF}
+#ACF plot of residuals
+Acf(hw_residual, main="ACF of Residuals - Holt Winter Forecast")
+```
+
+**ACF of Residuals**
+- The ACF plot of residuals shows that most autocorrelation values fall within the 95% confidence bands.  
+- This implies that residuals are **uncorrelated over time**, meeting the assumption of independence.  
+- It also suggests that the Holt–Winters model has adequately captured the serial dependence in the original time series.
+
+#### 4.4.3 Accuracy & Summary
+```{r hw-accuracy}
+accuracy(forecast_hw)
+forecast_hw
+plot(forecast_hw)
+```
+
+**Model Accuracy**
+
+
+**Forecast for the Next Year**
+The model predicts tourist arrivals (in thousands) for next year as follows:
+| Quarter | Forecasted Value |
+|----------|------------------|
+| 2012 Q4 | **90.46** |
+| 2013 Q1 | **96.56** |
+| 2013 Q2 | **51.76** |
+| 2013 Q3 | **89.99** |
+
+
+
+**Summary:**  
+The Holt–Winters additive method delivers accurate, stable forecasts and effectively models both trend and seasonal variations,  
+making it one of the most suitable approaches for this quarterly tourism dataset.
+
+### 4.5 Accuracy Summary
+
+```{r accuracy-summary}
+# Create accuracy comparison table
+model_comparison <- rbind(
+  naive = accuracy(arrival_naive),
+  ss = accuracy(ss_arrival),
+  ma = accuracy(forecast_ma6),
+  hw = accuracy(forecast_hw)
+)
+
+rownames(model_comparison) <- c( "Naive",  "SES", "Moving Average","Holt Winter")
+round(model_comparison[, c("RMSE","MAE","MAPE","MASE")], 3)
+
+```
+
+**Best and Worst Models by Metric**
+
+| **Accuracy Measure** | **Best Model** | **Worst Model** | **Interpretation** |
+|------------------|----------------|-----------------|--------------------|
+| **MAPE** | **Moving Average** | Naïve | MA performs best on a scaled basis, far outperforming all others. |
+
+
+- Although the Moving Average model reports the lowest MAPE (≈0.9%), this result is likely misleading. Its extremely low RMSE (1.6) compared to Holt-Winters (13.8) is unrealistic and suggests that the model’s residuals are artificially compressed — meaning the predicted series fluctuates far less than the actual data. In other words, the Moving Average model achieves a small error only because it produces an overly smoothed forecast, failing to capture genuine variations or dynamic changes in the time series.
+
+- Therefore, while the Moving Average model shows the smallest numerical error, it likely reflects over-smoothing and reduced sensitivity rather than true predictive accuracy. In contrast, the **Holt-Winters model**, with a slightly higher MAPE but more realistic temporal behavior, remains the most reliable and interpretable forecasting approach, as it effectively captures both trend and seasonality in the data.
+
+### 5. Summary Conclusion
+**Overall**
+- 
+
+**Based on the selected models and forecasts:**
+- **Next Year**: 
+- **Next Two Years**: 
+
+Overall, 
+
+
+
+
+
+
+
