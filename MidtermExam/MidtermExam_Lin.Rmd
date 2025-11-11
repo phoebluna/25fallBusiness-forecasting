@@ -5,81 +5,111 @@ date: "Nov 10, 2025"
 output: html_document
 ---
 
+# Forecasting car sales in the US. Forecasting car sales helps understand the economic health of a region by monthly.
+
 ## 1. Import Data
-
-### Data Description
-
 
 ```{r ImportData}
 library(readr)
 library(fpp2)
 library(TTR)
-data_csv <- read_csv("")
-head(data_csv)
+
+data_csv <- read_csv("TOTALSA.csv")
 
 spec(data_csv)
-Raw_data <- data_csv$
+Raw_data <- data_csv$'Sales Units(in Millions)'
 
-ts <- ts(Raw_data, frequency = 12, start = c(2000,1)) 
-head(ts)
-tail(ts)
+carsales_ts <- ts(Raw_data, frequency = 12, start = c(2019, 1))
+
+head(carsales_ts)
+
+tail(carsales_ts)
 ```
 
 ## 2. Data Overview
 
 ### 2.1 Time Series Plot
 ```{r timeSeriesPlot}
-plot(ts)
+plot(carsales_ts, ylab = "sales unit(in millions)")
 ```
 
 ### 2.2 Summary of time series plot Observations
+- From 2019 to early 2020: Sales remained steady at around 17–18 million units.
+- Mid-2020: There was a sharp decline, clearly affected by COVID-19, with a low point of about 9 million units.
+- 2021 to 2024: Sales gradually recovered but fluctuated, stabilizing around 14–16 million units.
+- Trend: Overall, it shows a V-shaped recovery, though sales have not yet fully returned to pre-2019 levels.
 
+Since the earlier data is not representative, this forecasting will keep only the data from **September 2021 onward**.
 
-### 2.3 Remove data plot and ACF plot 
+### 2.3 Remove data plot 
 
-```{r acfPlot}
-ts_data <- window(ts, start = c(1996,1))
+```{r ts-Plot2}
+ts_carsales_data <- window(carsales_ts, start = c(2021,9))
 
-plot(ts_data)
-
-Acf(ts_data)
+plot(ts_carsales_data, ylab = "sales unit(in millions)")
 ```
 
-### 2.4 Summary of ACF Plot Observations
+> The overall trend shows a gradual upward movement.
+> Sales tend to dip around October- Novmember each year, followed by an increase toward the end of the year or early next year.
+> sales tend to peak around mid-of year.
 
-The **Autocorrelation Function (ACF)** plot for the Japan tourist arrivals time series shows the following characteristics:
 
-- **Strong positive autocorrelation at small lags**, gradually decreasing as lag increases.  
-  This pattern confirms the **presence of a long-term trend** in the data — consecutive observations are highly correlated.  
-- **Repeating spikes at lag multiples** indicate a **seasonal component** with a quarterly frequency.  
-  This aligns with the dataset’s quarterly nature and the seasonal peaks observed in the time series plot.  
+### 2.4 ACF plot 
 
-Overall, the ACF plot supports the earlier findings that the data exhibits both **trend** and **seasonality**
+```{r acf-plot}
+
+Acf(ts_carsales_data)
+```
+
+**ACF Plot Observations**
+
+- The ACF still shows a gradual decline with positive values in the early lags — consistent with a trending series.
+
+- Weak seasonality 
+
+Overall, the ACF plot supports the earlier findings that the data exhibits **trend** and **seasonal**.
 
 ### 2.5 Central Tendency
 
 ```{r centralTendency}
 # Display summary statistics
-summary(ts_data)
+summary(ts_carsales_data)
 
 # Create a box plot for visualizing distribution
-boxplot(ts_data,
-        main = "",
-        ylab = "",
+boxplot(ts_carsales_data,
+        main = "Boxplots - Car sales from Sep 2021 - Feb 2024",
+        ylab = "sales unit(in millions)",
         col = "lightblue",
         border = "darkblue")
+
+# box plot for visualizing distribution by year
+years  <- floor(time(ts_carsales_data))
+values <- as.numeric(ts_carsales_data)
+df <- data.frame(year = years, value = values)
+boxplot(value ~ year, data = df,
+        main = "Boxplots by Year - Car sales from Sep 2021 - Feb 2024",
+        xlab = "Year", ylab = "sales unit(in millions)",
+        col = "lightblue", border = "gray40", outline = TRUE, las = 2, cex.axis = 0.7)
 ```
 
 ### 2.6 Summary of Statistics and Box Plot Observations
 
+- Sales mostly range between 13 – 16 million units, showing moderate variation.
+- The mean ≈ median → distribution is roughly symmetric, not strongly skewed.
+- No extreme outliers — suggesting a stable, consistent sales pattern.
+- Car sales were stable and moderately increasing after 2021, without large shocks.
+- A clear upward trend year-to-year: 2021 < 2022 < 2023; 2023–2024 plateau suggests the market reached a new steady level.
+
+From September 2021 to February 2024, U.S. car sales show a steady post-pandemic recovery, rising from around 13 M to 16 M units with stable, low-volatility distribution and no strong outliers.
+The year-by-year box plots confirm a positive trend and market stabilization by 2023.
 
 ## 3. Accuracy Evaluation Criteria
 
-For this dataset, MAPE (Mean Absolute Percentage Error) is selected as the primary accuracy metric.
-Since the goal is to forecast future tourist arrivals and communicate performance in interpretable terms, MAPE provides a clear percentage-based measure of average prediction error.
-The Japan tourist arrivals data consist of positive and stable values, making MAPE appropriate and reliable.
+The forecasting accuracy of each model is evaluated using four common metrics: RMSE, MAE, MAPE, and MASE.
 
-In addition, Root Mean Squared Error (RMSE) is reported to capture the absolute magnitude of forecast deviations and to identify models that better reflect the overall variability in tourist arrivals.
+For this dataset, **MAPE (Mean Absolute Percentage Error)** is selected as the primary accuracy metric.
+Since the goal is to forecast future sales in interpretable terms, MAPE provides a clear percentage-based measure of average prediction error.
+
 
 ## 4. Models
 
@@ -87,36 +117,36 @@ In addition, Root Mean Squared Error (RMSE) is reported to capture the absolute 
 ### 4.1 Decomposition
 
 ```{r decomposition}
+
 #decomposition
-stl_decomp <- stl(ts_data, s.window = "periodic")
+stl_decomp <- stl(ts_carsales_data, s.window = "periodic")
 plot(stl_decomp)
 attributes(stl_decomp)
 
 ```
 
-- The seasonal component shows a **clear and stable quarterly pattern** throughout the entire period, confirming consistent seasonality in Japan’s tourist arrivals.
+- The seasonal component shows a **clear and stable pattern**, peak **around April** and bottom **around October**, throughout the entire period, confirming consistent seasonality.
 
-- The **amplitude of seasonal fluctuations** remains relatively constant over time, supporting the use of an additive decomposition model rather than multiplicative.
+- The decomposition is additive.
 
-> This pattern reflects an overall downward trend in inbound tourism after an initial rise, while maintaining a consistent seasonal rhythm.
 
 ```{r decomposition-plot}
 # seasonal adjustment
 seasadj(stl_decomp)
 # Plot a line on the graph
-plot(ts_data)
+plot(ts_carsales_data, ylab = "sales unit(in millions)")
 lines(seasadj(stl_decomp), col="Red")
 ```
 
-> The seasonally adjusted series (red line) smooths out the periodic ups and downs seen in the original data, confirming that the time series exhibits strong and consistent seasonal fluctuations that significantly affect the short-term values of tourist arrivals.
+The seasonally adjusted series (red line) smooths out the periodic ups and downs seen in the original data, but **not too much**, confirming that the time series exhibits **weak seasonal fluctuations**.
 
 
 ### 4.2 Naive Model
 
 ```{r Naive-model}
 # Model output
-arrival_naive <- naive(ts_data,4)
-plot(arrival_naive)
+carsales_naive <- naive(ts_carsales_data,12)
+plot(carsales_naive, ylab = "sales unit(in millions)")
 ```
 
 - The naïve model simply uses the last observed value of the time series as the forecast for all future periods.
@@ -127,78 +157,87 @@ plot(arrival_naive)
 
 
 ```{r naive-residual}
-arrival_nv_residual <- residuals(arrival_naive)
-plot(arrival_nv_residual, main="Residuals from Naïve Forecast", ylab="Residuals", xlab = "Year")
+carsales_nv_residual <- residuals(carsales_naive)
+plot(carsales_nv_residual, main="Residuals from Naïve Forecast", ylab="Residuals", xlab = "Year")
 abline(h=0, col="red")
 ```
 
-
+> The residuals are *centered* near zero (no major bias).
+> However, there are repeat peak and bottom on this plot, and these patterns indicate that the Naïve method **fails** to fully account for the seasonal and trend components in the data.
 
 ```{r naive-residual_histogram}
-hist(arrival_nv_residual, main="Histogram of Naïve Forecast Residuals",
+hist(carsales_nv_residual, main="Histogram of Naïve Forecast Residuals",
      xlab="Residuals", col="lightblue", border="white")
 ```
 
-
+> The residuals are centered near zero, but the distribution isn’t symmetric. 
+> That indicats the Naïve model doesn’t fit the data perfectly — some structure like seasonality is still left in the residuals.
 
 
 ```{r naive-residual-vs-fitted}
-arrival_nv_fitted <- fitted(arrival_naive)
+carsales_nv_fitted <- fitted(carsales_naive)
 
-plot(as.numeric(arrival_nv_fitted), as.numeric(arrival_nv_residual),
+plot(as.numeric(carsales_nv_fitted), as.numeric(carsales_nv_residual),
      main = "Residuals vs Fitted (Naïve Model)",
      xlab = "fitted values", ylab = "Residuals")
 abline(h = 0, col = "red")
 ```
 
+> Although the residuals are centered around zero, the distribution is not completely symmetric, indicating that the Naïve model does not fully capture the trend or seasonality.
+> There is no clear linear pattern, suggesting that there are no strong systematic errors and the residuals are largely random in value.
+> However, the residuals show considerable fluctuation, implying that the model’s forecasting accuracy is relatively low.
 
 ```{r naive-actual-vs-residuals}
-plot(as.numeric(ts_data),as.numeric(arrival_nv_residual),
+plot(as.numeric(ts_carsales_data),as.numeric(carsales_nv_residual),
      main = "Actual Values vs Residuals (Naïve Model)",
      xlab = "Actual Values", ylab = "Residuals",
      type = "p", pch = 19, col = "darkblue", cex= 0.8)
 abline(h = 0, col = "red")
 ```
 
-
+> The “Actual vs Residuals” plot conveys a similar interpretation as the “Fitted vs Residuals” plot — the residuals are roughly centered around zero with no strong pattern, but the wide spread suggests the Naïve model does not fully capture the underlying structure of the time series.
 
 ```{r naive-acf}
-Acf(arrival_nv_residual, main="ACF of Residuals - Naïve Forecast")
+Acf(carsales_nv_residual, main="ACF of Residuals - Naïve Forecast")
 ```
 
-
+> The ACF plot of residuals shows significant autocorrelation at seasonal lags and outside the blue lines, indicating that the Naïve model has not fully captured the underlying seasonal pattern in the time series. Therefore, the residuals are not white noise.
 
 #### 4.2.2 Accuracy & Conclusion
 ```{r naive-accuracy}
-accuracy(arrival_naive)
-arrival_naive$mean
-autoplot(arrival_naive) +
+accuracy(carsales_naive)
+carsales_naive$mean
+autoplot(carsales_naive) +
   ggtitle("") +
   ylab("") +
   xlab("Year") +
   theme_minimal()
 ```
+
+**Naïve method**  uses the last observed value as the forecast for all future periods.
 	
  **Accuracy**
+- The model performs quite well for a baseline, with MAPE ≈ 3.6%, indicating that the naïve forecast fits recent sales patterns closely.
 
-
- **Interpretation**
+**Forecasted Value (1 Year Ahead)**
+-	The model predicts flat future values (no trend or seasonal change).
+-	For all months in next year, the predicted sales = 16.191 million units.
+-	This is simply the last observed value repeated across the forecast horizon.
  
-
- **Conclusion**
+**Conclusion**
 The Naïve forecast provides a simple benchmark model with easy interpretation but limited predictive capability. It serves as a baseline.
 
 ### 4.3 Moving Averages
 
 ```{r MA-model}
 # Compute moving averages of different orders
-MA3_forecast <- ma(ts_data, order = 3)
-MA6_forecast <- ma(ts_data, order = 6)
-MA9_forecast <- ma(ts_data, order = 9)
+MA3_forecast <- ma(ts_carsales_data, order = 3)
+MA6_forecast <- ma(ts_carsales_data, order = 6)
+MA9_forecast <- ma(ts_carsales_data, order = 9)
 
 # Plot original time series
-plot(ts_data, main = "Simple Moving Averages (Orders 3, 6, 9)",
-     ylab = "Tourist Arrivals (Thousands)", xlab = "Year", col = "black")
+plot(ts_carsales_data, main = "Simple Moving Averages (Orders 3, 6, 9)",
+     ylab = "sales unit(in millions)", xlab = "Year", col = "black")
 
 # Add the three moving averages
 lines(MA3_forecast, col = "red", lwd = 2)
@@ -207,10 +246,10 @@ lines(MA9_forecast, col = "green", lwd = 2)
 
 # Forecast next 4 quarters using order 6 (bonus)
 fit_ma6 <- auto.arima(na.omit(MA6_forecast))
-forecast_ma6 <- forecast(fit_ma6, h = 4)
+forecast_ma6 <- forecast(fit_ma6, h = 12)
 lines(forecast_ma6$mean, col = "purple", lwd = 2)
 
-legend("bottomleft",
+legend("topleft",
        legend = c("Original", "MA(3)", "MA(6)", "MA(9)", "Forecast MA(6)"),
        col = c("black", "red", "blue", "green", "purple"),
        lwd = 2, bty = "n")
@@ -221,88 +260,95 @@ legend("bottomleft",
 - The **MA(3)** line (red) still follows most of the short-term fluctuations.  
 - The **MA(6)** line (blue) reduces seasonal noise and captures medium-term trends better.  
 - The **MA(9)** line (green) is the smoothest, showing the long-term movement but lagging behind actual changes.  
-- Using MA(6), the forecast for the next 4 quarters predicts stable arrivals with mild variations.
+- Using **MA(6)**, the forecast for the next 12 month predicts stable sales with mild variations.
 
 Overall, increasing the order of the moving average reduces short-term noise but delays response to sudden changes in the data.
 
 ### 4.3 Simple Smoothing
+
 ```{r simple-smooting-model}
-ss_arrival <- ses(ts_data, h = 4)
-plot(ss_arrival)
-ss_arrival$model
+ss_carsales <- ses(ts_carsales_data, h = 12)
+plot(ss_carsales)
+ss_carsales$model
 ```
 
 **Model Parameters**
-- **Alpha (α) = 0.28** 
+- **Alpha (α) = 0.5635**, it assigns moderate weight to recent data (about half).The model reacts reasonably quickly to new changes, but still smooths out short-term fluctuations.
 
-- **The initial level (≈204.5)**  
+- **The initial level (≈13.0045)**, The SES model begins with an initial estimated sales level of 13.00 million units (around the early period of Sep 2021).
 
-- **The estimated sigma of 25.6** 
+- **The estimated sigma of 0.6269**, On average, actual sales deviate from the fitted values by about 0.63 million units.	A smaller sigma indicates a tighter fit and more reliable model predictions; here, 0.63 shows a moderately accurate fit.
 
-Overall, 
+Overall, the SES model uses a moderate smoothing factor (α = 0.56), starts from an initial sales level of 13.00 million, and has a residual standard deviation of ≈ 0.63 million, indicating a fairly stable but responsive forecast model.
 
 #### 4.3.1 Residual Analysis
 
 ```{r SS-residual}
-ssrs_arrival <- residuals(ss_arrival)
-plot(ssrs_arrival, main="Residuals from Simple Smoothing Forecast", ylab="Residuals", xlab = "Year")
+ssrs_carsales <- residuals(ss_carsales)
+plot(ssrs_carsales, main="Residuals from Simple Smoothing Forecast", ylab="Residuals", xlab = "Year")
 abline(h=0, col="red")
 ```
 
-
+> The residuals fluctuate around zero, indicating no systematic bias in the model.
+> However, the repeating peaks and troughs suggest that some seasonal pattern remains in the residuals — meaning the Simple Exponential Smoothing model has not captured the seasonality in the data.
 
 ```{r SS-residual-histogram}
-hist(ssrs_arrival, main = "Histogram of SS model Residual", xlab="Residuals", col="lightblue", border="white")
+hist(ssrs_carsales, main = "Histogram of SS model Residual", xlab="Residuals", col="lightblue", border="white")
 ```
 
-**Observations:**
+> The residuals from the SES model are centered near zero and mostly symmetric, indicating an unbiased and reasonably well-fitting model. The small spread confirms that most forecast errors are random and moderate in size.
 
 
 ```{r SS-residual-vs-fitted}
-ssarrival_fitted <- fitted(ss_arrival)
+sscars_fitted <- fitted(ss_carsales)
 
-plot(as.numeric(ssarrival_fitted), as.numeric(ssrs_arrival),
+plot(as.numeric(sscars_fitted), as.numeric(ssrs_carsales),
      main="Fitted Values vs Residuals (SS Model)",
      xlab="Fitted Values", ylab="Residuals")
 abline(h=0, col="red")
 ```
 
-**Observations:**
+> The residuals are randomly scattered around the red zero line without a clear pattern or curvature, indicating that the model has no systematic bias — the errors don’t consistently increase or decrease with the fitted values. However, there are a few outlier points, suggesting that in some months the model’s forecasts deviated more from the actual sales than usual, possibly due to unexpected market fluctuations or irregular events.
 
 
 ```{r SS-actual-vs-residuals}
-plot(as.numeric(arrivals_ts), as.numeric(ssrs_arrival),
+plot(as.numeric(ts_carsales_data), as.numeric(ssrs_carsales),
      main = "Actual Values vs Residuals (SS Model)",
      xlab = "Actual Values", ylab = "Residuals",
      type = "p", pch = 19, col = "darkblue", cex= 0.8)
 abline(h = 0, col = "red")
 ```
 
-
+> The Actual vs. Residuals plot confirms that residuals are randomly distributed with constant variance and no visible bias, supporting that the Simple Exponential Smoothing model provides a good fit overall, aside from a few isolated outliers.
 
 
 ```{r ss-acf}
-Acf(ssrs_arrival, main="ACF of Residuals - SS Forecast")
+Acf(ssrs_carsales, main="ACF of Residuals - SS Forecast")
 ```
 
->
+> Most of the residual autocorrelations lie within the 95% confidence limits, indicating that the SES model residuals are largely uncorrelated and behave like white noise — confirming that the model adequately captures the data’s underlying structure.
 
 #### 4.3.2 Accuracy & summary
 
 ```{r ss-accuracy}
-accuracy(ss_arrival)
-ss_arrival
-plot(ss_arrival)
+accuracy(ss_carsales)
+ss_carsales
+plot(ss_carsales)
 ```
 
+**Accuracy summary**
+- The SES model shows strong forecasting accuracy, with a low MAPE (~3%) and low residual autocorrelation, indicating a good fit and reliable short-term forecasts.
 
+**Forecasted Value (One Year Ahead)**
+- The model expects car sales to remain stable around 16 million units over the next year, without strong upward or downward movement.
 
+The SES model provides highly accurate short-term forecasts (MAPE ≈ 3%), predicting stable car sales of about 16 million units in the coming year. The residuals show no major autocorrelation, confirming a good model fit, though SES may not fully capture longer-term upward trends.
 
 ### 4.4 Holt-Winters
 
 #### 4.4.1 Holt Winters Model perform
 ```{r holt-winter-model}
-hw_forecast <- hw(ts_data)
+hw_forecast <- hw(ts_carsales_data)
 forecast_hw <- forecast(hw_forecast, h = 4)
 forecast_hw$model
 ```
@@ -342,7 +388,7 @@ abline(h=0, col="red")
 
 ```{r hw-values-residuals}
 # real values vs residuals
-plot(as.numeric(arrivals_ts), as.numeric(hw_residual),
+plot(as.numeric(ts_carsales_data), as.numeric(hw_residual),
      main = "Actual Values vs Residuals (Holt Winter Model)",
      xlab = "Actual Values", ylab = "Residuals",
      type = "p", pch = 19, col = "darkblue", cex= 0.8)
@@ -392,8 +438,8 @@ making it one of the most suitable approaches for this quarterly tourism dataset
 ```{r accuracy-summary}
 # Create accuracy comparison table
 model_comparison <- rbind(
-  naive = accuracy(arrival_naive),
-  ss = accuracy(ss_arrival),
+  naive = accuracy(carsales_naive),
+  ss = accuracy(ss_carsales),
   ma = accuracy(forecast_ma6),
   hw = accuracy(forecast_hw)
 )
