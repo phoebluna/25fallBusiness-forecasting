@@ -5,9 +5,12 @@ date: "Nov 10, 2025"
 output: html_document
 ---
 
-# Forecasting car sales in the US. Forecasting car sales helps understand the economic health of a region by monthly.
+## Forecasting car sales in the US. 
+- Forecasting car sales helps understand the economic health of a region.
+- This data set is about car sales from Jan 2019  to Feb 2024 by monthly.
 
 ## 1. Import Data
+
 
 ```{r ImportData}
 library(readr)
@@ -201,7 +204,8 @@ abline(h = 0, col = "red")
 Acf(carsales_nv_residual, main="ACF of Residuals - Naïve Forecast")
 ```
 
-> The ACF plot of residuals shows significant autocorrelation at seasonal lags and outside the blue lines, indicating that the Naïve model has not fully captured the underlying seasonal pattern in the time series. Therefore, the residuals are not white noise.
+> The ACF of residuals for the Naïve forecast shows that most autocorrelations fall within the 95% confidence limits, indicating that the residuals are largely uncorrelated and behave like white noise. The model adequately captures the short-term dynamics of the series, with only a weak correlation at lag 1 suggesting minor persistence.
+
 
 #### 4.2.2 Accuracy & Conclusion
 ```{r naive-accuracy}
@@ -349,11 +353,16 @@ The SES model provides highly accurate short-term forecasts (MAPE ≈ 3%), predi
 #### 4.4.1 Holt Winters Model perform
 ```{r holt-winter-model}
 hw_forecast <- hw(ts_carsales_data)
-forecast_hw <- forecast(hw_forecast, h = 4)
+forecast_hw <- forecast(hw_forecast, h = 12)
 forecast_hw$model
 ```
 
-	
+**Parameter Value**
+- α (Alpha)= 0.0033 Very small，the level component changes very slowly, meaning the model gives little weight to recent observations.
+- β (Beta) = 0.0001 Almost zero indicates an almost flat trend, so the model assumes sales are stable over time.
+- γ (Gamma) 0.0003 Very small，minimal seasonal adjustment, confirming weak or negligible seasonality.
+
+The smoothing parameters are extremely low, showing that the series is quite stable with no strong seasonality, and the model heavily smooths past data to produce steady forecasts.
 
 #### 4.4.2 Residual Analysis — Holt–Winters Model
 
@@ -365,7 +374,7 @@ plot(hw_residual, main = "Residuals from Holt Winter Model", ylab="Residuals", x
 abline(h=0, col="red")
 ```
 
-
+> The residuals from the Holt–Winters model oscillate around zero without clear systematic bias, confirming a reasonable fit. However, mild autocorrelation and one strong negative residual near 2024 indicate that the model slightly underreacts to recent short-term fluctuations.
 	
 
 ```{r hw-residual-his}
@@ -373,7 +382,7 @@ abline(h=0, col="red")
 hist(hw_residual, main = "Histogram of Holt Winter model Residual", xlab="Residuals", col="lightblue", border="white")
 ```
 
-
+> The residual histogram shows a near-normal distribution centered around zero, confirming no major bias in forecasts. Although a few negative outliers exist, the overall pattern suggests that the Holt–Winters model provides stable and reasonably accurate predictions.
 
 
 ```{r hw-residual-fitted}
@@ -384,7 +393,7 @@ plot(as.numeric(fitted(forecast_hw)), as.numeric(hw_residual),
 abline(h=0, col="red")
 ```
 
-
+> The residuals from the Holt–Winters model are randomly distributed around zero, indicating no systematic bias. Almost all points fall within the range +1 and -1, except for one mild outlier at a fitted value around 17, suggesting the model slightly under-predicted a high sales month.
 
 ```{r hw-values-residuals}
 # real values vs residuals
@@ -395,7 +404,7 @@ plot(as.numeric(ts_carsales_data), as.numeric(hw_residual),
 abline(h = 0, col = "red")
 ```
 
-
+> The residuals’ random pattern confirms that the Holt–Winters model performs well overall, with no systematic bias in predictions. The single negative outlier near 15.5 indicates a specific month where actual sales were significantly higher than expected — possibly due to an unusual demand spike that the model couldn’t capture.
 
 
 ```{r hw-residual-ACF}
@@ -404,7 +413,7 @@ Acf(hw_residual, main="ACF of Residuals - Holt Winter Forecast")
 ```
 
 **ACF of Residuals**
-- The ACF plot of residuals shows that most autocorrelation values fall within the 95% confidence bands.  
+- The ACF plot of residuals shows that all autocorrelation values fall within the 95% confidence bands.  
 - This implies that residuals are **uncorrelated over time**, meeting the assumption of independence.  
 - It also suggests that the Holt–Winters model has adequately captured the serial dependence in the original time series.
 
@@ -416,22 +425,23 @@ plot(forecast_hw)
 ```
 
 **Model Accuracy**
+- RMSE = 0.5076: The model’s typical error is about 0.5 units — relatively low, indicating a good fit.
+- MAE = 0.4126: Average absolute deviation from actual values — shows stable accuracy.
+- MAPE= 2.74%: The model’s average percentage error is under 3%, which is very accurate for time series forecasting.
+- ACF1 = 0.3369: Some minor autocorrelation remains, meaning small structure in residuals still exists but is not severe.
 
 
 **Forecast for the Next Year**
-The model predicts tourist arrivals (in thousands) for next year as follows:
-| Quarter | Forecasted Value |
+The model predicts sales unit(in millions) for next year as follows:
+| Month | Forecasted Value |
 |----------|------------------|
-| 2012 Q4 | **90.46** |
-| 2013 Q1 | **96.56** |
-| 2013 Q2 | **51.76** |
-| 2013 Q3 | **89.99** |
-
+| Mar 2024 | **16.68** |
+| Dec 2024 | **17.26** |
+| Feb-Mar 2025 | **17.5** |
 
 
 **Summary:**  
-The Holt–Winters additive method delivers accurate, stable forecasts and effectively models both trend and seasonal variations,  
-making it one of the most suitable approaches for this quarterly tourism dataset.
+The Holt–Winters additive model accurately captures both trend and seasonality in the series, achieving a MAPE below 3%. It forecasts a steady rise in the next year, with predicted values increasing from about 16.7 to 17.3, indicating moderate growth with stable model reliability.
 
 ### 4.5 Accuracy Summary
 
@@ -444,34 +454,51 @@ model_comparison <- rbind(
   hw = accuracy(forecast_hw)
 )
 
-rownames(model_comparison) <- c( "Naive",  "SES", "Moving Average","Holt Winter")
+rownames(model_comparison) <- c( "Naive",  "Simple Smoothing", "Moving Average","Holt Winter")
 round(model_comparison[, c("RMSE","MAE","MAPE","MASE")], 3)
 
 ```
+**Naïve Forecast**
+- Assumes the next value will be equal to the most recent observation.
+- Very simple baseline model — useful for comparison, especially when data show no clear trend or seasonality.
+
+**Simple Exponential Smoothing (SES)**
+- Uses weighted averages of past observations, giving more weight to recent data.
+- Effective for short-term forecasts when data have no clear trend or seasonality; smooths out random fluctuations.
+
+**Moving Average (MA)**
+- Averages a fixed number of the most recent observations to predict the next value.
+- Reduces noise and captures short-term patterns; very effective for stable or stationary data.
+
+**Holt–Winters (Additive)**
+- Extends exponential smoothing to include both trend and seasonal components.
+- Best for time series with trend and seasonality — adjusts dynamically to both patterns.
+
 
 **Best and Worst Models by Metric**
 
 | **Accuracy Measure** | **Best Model** | **Worst Model** | **Interpretation** |
 |------------------|----------------|-----------------|--------------------|
-| **MAPE** | **Moving Average** | Naïve | MA performs best on a scaled basis, far outperforming all others. |
+| **MAPE** | **Moving Average** | Naïve Model | MA performs best on a scaled basis, far outperforming all others. |
 
+The Moving Average model achieves the lowest error values across all metrics (RMSE, MAE, MAPE, and MASE), indicating excellent short-term forecasting accuracy.
 
-- Although the Moving Average model reports the lowest MAPE (≈0.9%), this result is likely misleading. Its extremely low RMSE (1.6) compared to Holt-Winters (13.8) is unrealistic and suggests that the model’s residuals are artificially compressed — meaning the predicted series fluctuates far less than the actual data. In other words, the Moving Average model achieves a small error only because it produces an overly smoothed forecast, failing to capture genuine variations or dynamic changes in the time series.
-
-- Therefore, while the Moving Average model shows the smallest numerical error, it likely reflects over-smoothing and reduced sensitivity rather than true predictive accuracy. In contrast, the **Holt-Winters model**, with a slightly higher MAPE but more realistic temporal behavior, remains the most reliable and interpretable forecasting approach, as it effectively captures both trend and seasonality in the data.
 
 ### 5. Summary Conclusion
 **Overall**
-- 
+- The time series of car sales shows a gradual upward trend over the historical period.
+- There is moderate seasonality, with recurring fluctuations across quarters, suggesting that car sales tend to rise and fall at similar times each year.
+- Short-term noise is visible, but the general movement remains increasing and cyclical
 
 **Based on the selected models and forecasts:**
-- **Next Year**: 
-- **Next Two Years**: 
+- **Next Year**: Car sales are likely to increase slightly or remain steady in the next year.
+- **Next Two Years**: , car sales will maintain a stable upward trend over the following two years, consistent with previous seasonal behavior.
 
-Overall, 
-
-
-
+**Ranking of Forecasting methods**
+1st – Moving Average: Best accuracy (lowest MAPE).
+2nd – Holt–Winters (Additive): Robust for trend and seasonality.
+3rd – Simple Exponential Smoothing (SES): Good smoothing, handles short-term noise.
+4th – Naïve Model: Baseline only.
 
 
 
