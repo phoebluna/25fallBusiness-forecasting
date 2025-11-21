@@ -1,5 +1,5 @@
 ---
-title: "MidtermPractice"
+title: "FinalProject"
 author: "Lin Xiao"
 date: "2025-10-10"
 output: html_document
