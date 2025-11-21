@@ -1,0 +1,593 @@
+---
+title: "MidtermPractice"
+author: "Lin Xiao"
+date: "2025-10-10"
+output: html_document
+---
+
+## 1. Import Data
+
+### Data Description
+
+The dataset arrivals (from the fpp2 package) contains **quarterly international tourist arrivals** to Australia from major source countries: Japan, New Zealand, the UK, and the US (1981–2012).
+
+- It includes one **time series** variable (`Japan arrivals`), measured four times per year (quarterly).  
+
+- The data were originally obtained from the *fpp2* package and are expressed in thousands of visitors.
+
+```{r ImportData}
+library(readr)
+library(fpp2)
+library(TTR)
+arrivals_data_csv <- read_csv("arrivals_quarterly.csv")
+head(arrivals_data_csv)
+
+spec(arrivals_data_csv)
+arrivals_ts_t <- ts(arrivals_data_csv$Japan, start=c(1981,1), frequency=4)
+
+head(arrivals_ts_t)
+tail(arrivals_ts_t)
+```
+
+## 2. Data Overview
+
+### 2.1 Time Series Plot
+```{r timeSeriesPlot}
+plot(arrivals_ts_t, ylab = "Japan Arrivals", col= "red")
+```
+
+### 2.2 Summary of time series plot Observations
+
+The time series of **Japan tourist arrivals (1981–2012)** shows several key characteristics:
+
+- **trend:** Strong growth up to ~1996, followed by a flattening/slight decline from the mid-to-late 1990s onward.
+
+- **Strong seasonality:** Regular quarterly peaks and troughs indicate recurring seasonal patterns, likely associated with holiday or vacation cycles.  
+
+- **Increasing variability:** The amplitude of seasonal swings increases over time (later years show larger ups and downs).
+
+Overall, the series demonstrates both trend and seasonality.
+However, since the recent portion of the series shows a different trend pattern — with a slight decline after 1996 — the data prior to 1996 were excluded to **retain only the more recent and relevant trend period** for modeling.
+
+### 2.3 Remove data plot and ACF plot 
+
+```{r acfPlot}
+arrivals_ts <- window(arrivals_ts_t, start = c(1996,1))
+
+plot(arrivals_ts)
+
+Acf(arrivals_ts)
+```
+
+### 2.4 Summary of ACF Plot Observations
+
+The **Autocorrelation Function (ACF)** plot for the Japan tourist arrivals time series shows the following characteristics:
+
+- **Strong positive autocorrelation at small lags**, gradually decreasing as lag increases.  
+  This pattern confirms the **presence of a long-term trend** in the data — consecutive observations are highly correlated.  
+- **Repeating spikes at lag multiples** indicate a **seasonal component** with a quarterly frequency.  
+  This aligns with the dataset’s quarterly nature and the seasonal peaks observed in the time series plot.  
+
+Overall, the ACF plot supports the earlier findings that the data exhibits both **trend** and **seasonality**
+
+### 2.5 Central Tendency
+
+```{r centralTendency}
+# Display summary statistics
+summary(arrivals_ts)
+
+# Create a box plot for visualizing distribution
+boxplot(arrivals_ts,
+        main = "Boxplot of Japan Tourist Arrivals (1996–2012)",
+        ylab = "Number of Arrivals (in thousands)",
+        col = "lightblue",
+        border = "darkblue")
+
+# box plot for visulizing distribution by year
+years  <- floor(time(arrivals_ts))
+values <- as.numeric(arrivals_ts)
+df <- data.frame(year = years, value = values)
+boxplot(value ~ year, data = df,
+        main = "Boxplots by Year",
+        xlab = "Year", ylab = "Arrivals (thousands)",
+        col = "lightblue", border = "gray40", outline = TRUE, las = 2, cex.axis = 0.7)
+
+```
+
+### 2.6 Summary of Statistics and Box Plot Observations
+
+- The summary statistics for the **Japan tourist arrivals (1981–2012)** show that arrivals ranged from 53.4 thousand to 227.6 thousand, with a mean of 152.9 thousand and a median of 165.8 thousand.
+
+- The interquartile range **(Q1–Q3 = 110.7–188.6)** indicates moderate variability, while the relatively close mean and median suggest that the data are approximately symmetric, with no strong skewness.
+
+- The boxplot indicates that most arrival values cluster around the median range, with only a few lower observations extending toward the bottom whisker, showing occasional **short-term declines**.
+
+- When viewed **by year**, the boxplots suggest that overall tourist arrivals gradually decreased over time, reflecting a general downward trend in inbound tourism from Japan during 1996–2012, while maintaining a consistent seasonal variation.
+
+Overall, the data illustrate **a slowly declining but still seasonally stable trend** in Japanese tourist arrivals during the period.
+
+## 3. Accuracy Evaluation Criteria
+
+For this dataset, MAPE (Mean Absolute Percentage Error) is selected as the primary accuracy metric.
+Since the goal is to forecast future tourist arrivals and communicate performance in interpretable terms, MAPE provides a clear percentage-based measure of average prediction error.
+The Japan tourist arrivals data consist of positive and stable values, making MAPE appropriate and reliable.
+
+## 4. Models
+
+
+### 4.1 Decomposition
+
+```{r decomposition}
+#decomposition
+stl_decomp <- stl(arrivals_ts, s.window = "periodic")
+plot(stl_decomp)
+attributes(stl_decomp)
+
+```
+
+- The seasonal component shows a **clear and stable quarterly pattern** throughout the entire period, confirming consistent seasonality in Japan’s tourist arrivals.
+
+- The **amplitude of seasonal fluctuations** remains relatively constant over time, supporting the use of an additive decomposition model rather than multiplicative.
+
+> This pattern reflects an overall downward trend in inbound tourism after an initial rise, while maintaining a consistent seasonal rhythm.
+
+```{r decomposition-plot}
+# seasonal adjustment
+seasadj(stl_decomp)
+# Plot a line on the graph
+plot(arrivals_ts)
+lines(seasadj(stl_decomp), col="Red")
+```
+
+> The seasonally adjusted series (red line) smooths out the periodic ups and downs seen in the original data, confirming that the time series exhibits strong and consistent seasonal fluctuations that significantly affect the short-term values of tourist arrivals.
+
+
+### 4.2 Naive Model
+
+```{r Naive-model}
+# Model output
+arrival_naive <- naive(arrivals_ts,4)
+plot(arrival_naive, col= 'red')
+```
+
+- The naïve model simply uses the last observed value of the time series as the forecast for all future periods.
+- The shaded region represents the forecast intervals, showing increasing uncertainty over time.
+
+
+#### 4.2.1 Residual Analysis
+
+
+```{r naive-residual}
+arrival_nv_residual <- residuals(arrival_naive)
+plot(arrival_nv_residual, main="Residuals from Naïve Forecast", ylab="Residuals", xlab = "Year")
+abline(h=0, col="red")
+```
+
+> The residuals are *centered* near zero (no major bias).
+> These patterns indicate that the Naïve method **fails** to fully account for the seasonal and trend components in the data.
+
+```{r naive-residual_histogram}
+hist(arrival_nv_residual, main="Histogram of Naïve Forecast Residuals",
+     xlab="Residuals", col="lightblue", border="white")
+```
+
+
+> The residuals are centered near zero, but the distribution isn’t symmetric.  
+> That indicats the Naïve model doesn’t fit the data perfectly — some structure like seasonality is still left in the residuals.
+
+
+
+```{r naive-residual-vs-fitted}
+arrival_nv_fitted <- fitted(arrival_naive)
+
+plot(as.numeric(arrival_nv_fitted), as.numeric(arrival_nv_residual),
+     main = "Residuals vs Fitted (Naïve Model)",
+     xlab = "fitted values", ylab = "Residuals")
+abline(h = 0, col = "red")
+```
+
+> Although the residuals are centered around zero, the distribution is not completely symmetric, indicating that the Naïve model does not fully capture the trend or seasonality.
+> There is no clear linear pattern, suggesting that there are no strong systematic errors and the residuals are largely random in value.
+> However, the residuals show considerable fluctuation, implying that the model’s forecasting accuracy is relatively low.
+
+```{r naive-actual-vs-residuals}
+plot(as.numeric(arrivals_ts),as.numeric(arrival_nv_residual),
+     main = "Actual Values vs Residuals (Naïve Model)",
+     xlab = "Actual Values", ylab = "Residuals",
+     type = "p", pch = 19, col = "darkblue", cex= 0.8)
+abline(h = 0, col = "red")
+```
+
+> The “Actual vs Residuals” plot conveys a similar interpretation as the “Fitted vs Residuals” plot — the residuals are roughly centered around zero with no strong pattern, but the wide spread suggests the Naïve model does not fully capture the underlying structure of the time series.
+
+```{r naive-acf}
+Acf(arrival_nv_residual, main="ACF of Residuals - Naïve Forecast")
+```
+
+> The ACF plot of residuals shows significant autocorrelation at seasonal lags (e.g., 4, 8, 12), indicating that the Naïve model has not fully captured the underlying seasonal pattern in the time series. Therefore, the residuals are not white noise.
+
+#### 4.2.2 Accuracy & Conclusion
+```{r naive-accuracy}
+accuracy(arrival_naive)
+arrival_naive$mean
+autoplot(arrival_naive) +
+  ggtitle("Naïve Forecast for Next 4 Quarters") +
+  ylab("Tourist Arrivals (Thousands)") +
+  xlab("Year") +
+  theme_minimal()
+```
+	
+ **Accuracy**
+The Naïve model’s accuracy is moderate. The MAPE around **21.7%** indicate poor predictive accuracy.The negative ACF1 (-0.57) shows residual autocorrelation, implying that the model fails to capture time-dependent patterns (especially seasonal effects).
+
+ **Interpretation**
+- The model predicts a constant level of **101.9 thousand arrivals per quarter** for the next year.  
+- Since the forecast is flat, it does not reflect the seasonal or cyclical variations present in the actual data.  
+
+ **Conclusion**
+The Naïve forecast provides a simple benchmark model with easy interpretation but limited predictive capability. It serves as a baseline.
+
+### 4.3 Moving Averages
+
+```{r MA-model}
+# Compute moving averages of different orders
+MA3_forecast <- ma(arrivals_ts, order = 3)
+MA6_forecast <- ma(arrivals_ts, order = 6)
+MA9_forecast <- ma(arrivals_ts, order = 9)
+
+# Plot original time series
+plot(arrivals_ts, main = "Simple Moving Averages (Orders 3, 6, 9)",
+     ylab = "Tourist Arrivals (Thousands)", xlab = "Year", col = "black")
+
+# Add the three moving averages
+lines(MA3_forecast, col = "red", lwd = 2)
+lines(MA6_forecast, col = "blue", lwd = 2)
+lines(MA9_forecast, col = "green", lwd = 2)
+
+# Forecast next 4 quarters using order 6 (bonus)
+fit_ma6 <- auto.arima(na.omit(MA6_forecast))
+forecast_ma6 <- forecast(fit_ma6, h = 4)
+lines(forecast_ma6$mean, col = "purple", lwd = 2)
+
+legend("bottomleft",
+       legend = c("Original", "MA(3)", "MA(6)", "MA(9)", "Forecast MA(6)"),
+       col = c("black", "red", "blue", "green", "purple"),
+       lwd = 2, 
+       bty = "n",
+       cex = 0.6,
+       inset = 0.02)
+```
+
+**Observations:**
+- As the moving average order increases, the series becomes progressively smoother.  
+- The **MA(3)** line (red) still follows most of the short-term fluctuations.  
+- The **MA(6)** line (blue) reduces seasonal noise and captures medium-term trends better.  
+- The **MA(9)** line (green) is the smoothest, showing the long-term movement but lagging behind actual changes.  
+- Using MA(6), the forecast for the next 4 quarters predicts stable arrivals with mild variations.
+
+Overall, increasing the order of the moving average reduces short-term noise but delays response to sudden changes in the data.
+
+### 4.3 Simple Smoothing
+```{r simple-smooting-model}
+ss_arrival <- ses(arrivals_ts, h = 4)
+plot(ss_arrival)
+ss_arrival$model
+```
+
+**Model Parameters**
+- **Alpha (α) = 0.28** indicats the model smooths out short-term fluctuations and emphasizes the long-term level of the series. It suggests that recent quarterly variations have only moderate influence on the forecasts.
+
+- **The initial level (≈204.5)** aligns with the early part of the data, indicating that the model’s starting point reflects the initial high level of tourist arrivals.  
+
+- **The estimated sigma of 25.6** shows moderate variation in residuals, implying the model can smooth noise but still leaves some random fluctuations unaccounted for.
+
+Overall, The Simple Exponential Smoothing (SES) model uses a smoothing parameter of α = 0.2815, indicating moderate responsiveness to recent changes. The model captures the overall level of Japan’s tourist arrivals (initial level ≈ 204.5) while filtering out short-term noise (σ ≈ 25.6).
+
+#### 4.3.1 Residual Analysis
+
+```{r SS-residual}
+ssrs_arrival <- residuals(ss_arrival)
+plot(ssrs_arrival, main="Residuals from Simple Smoothing Forecast", ylab="Residuals", xlab = "Year")
+abline(h=0, col="red")
+```
+
+> The residuals fluctuate around zero, indicating no systematic bias in the model.
+> However, the repeating peaks and troughs suggest that some seasonal pattern remains in the residuals — meaning the Simple Exponential Smoothing model has not captured the seasonality in the data.
+
+```{r SS-residual-histogram}
+hist(ssrs_arrival, main = "Histogram of SS model Residual", xlab="Residuals", col="lightblue", border="white")
+```
+
+**Observations:**
+- The residuals are approximately **centered around zero**, indicating that the SES model does not exhibit a consistent bias in over- or underestimation.
+- The distribution is **left-skewed**, with a few large negative residuals extending to around −80, while the right tail is relatively short (up to about +35).
+- Most residuals lie between −60 and +20, indicating a moderate spread around the mean.
+
+**Interpretation:**
+
+- The extended negative tail implies that the SES model overpredicted during certain periods — likely corresponding to quarters with unusually low tourist arrivals.
+- This skewness suggests that while the model captures the average level of the series reasonably well, it fails to account for seasonal dips or irregular declines, which result in large negative residuals during off-season periods.
+
+```{r SS-residual-vs-fitted}
+ssarrival_fitted <- fitted(ss_arrival)
+
+plot(as.numeric(ssarrival_fitted), as.numeric(ssrs_arrival),
+     main="Fitted Values vs Residuals (SS Model)",
+     xlab="Fitted Values", ylab="Residuals")
+abline(h=0, col="red")
+```
+
+**Observations:**
+-The residuals are generally centered around zero, but the scatter shows a concentration of points at both ends of the fitted value range (around 90 and 200).
+- A few large negative residuals (around −60) indicate notable overpredictions in some periods.
+- The middle range of fitted values (120–160) contains fewer points, suggesting less variation in that range.
+
+> The residuals are mostly centered around zero but cluster at the extremes, with several large negative outliers, indicating that the SES model tends to overestimate during low-demand periods and struggles to capture extreme fluctuations.
+
+```{r SS-actual-vs-residuals}
+plot(as.numeric(arrivals_ts), as.numeric(ssrs_arrival),
+     main = "Actual Values vs Residuals (SS Model)",
+     xlab = "Actual Values", ylab = "Residuals",
+     type = "p", pch = 19, col = "darkblue", cex= 0.8)
+abline(h = 0, col = "red")
+```
+
+
+> The residuals show a clear pattern: large negative values at low actuals and positive clustering at high actuals, indicating that the SES model tends to overestimate during low-demand periods and underestimate during high-demand periods, suggesting it does not fully capture the scale of variation in the data.
+
+
+```{r ss-acf}
+Acf(ssrs_arrival, main="ACF of Residuals - SS Forecast")
+```
+
+> The ACF plot of residuals still shows significant spikes at seasonal lags (for example, around lag 4, 8, 12, etc.), indicating that seasonal correlation remains in the residuals.
+> This means that the Simple Smoothing (SS) model — which only captures the level of the time series — did not adequately model the seasonal structure present in the data.
+
+#### 4.3.2 Accuracy & summary
+
+```{r ss-accuracy}
+accuracy(ss_arrival)
+ss_arrival
+plot(ss_arrival)
+```
+
+- MAPE = 15.86% suggests the forecasts deviate from actual values by about 16% on average, which is acceptable but not highly accurate for short-term forecasting.
+
+The SES model produces reasonable accuracy with a mild underestimation bias and no major residual autocorrelation, but the 15% MAPE indicates limited short-term precision due to its inability to model trend or seasonality.
+
+
+### 4.4 Holt-Winters
+
+#### 4.4.1 Holt Winters Model perform
+```{r holt-winter-model}
+hw_forecast <- hw(arrivals_ts)
+forecast_hw <- forecast(hw_forecast, h = 4)
+forecast_hw$model
+```
+
+- α (alpha) = 0.4588 → The smoothing level parameter indicates a moderate weighting on recent observations, meaning the model adjusts reasonably quickly to new changes in the series.
+- β (beta) ≈ 0 → The trend component is nearly flat, suggesting that the long-term trend in arrivals is stable or slowly declining, consistent with the historical data.
+- γ (gamma) ≈ 0 → Minimal seasonal smoothing adjustment, implying that the seasonal pattern is stable and does not vary significantly across years.
+- σ (sigma) = 14.73 → The residual standard deviation is relatively low, indicating good fit and reduced forecast uncertainty compared to SES or Naïve models.
+	
+Overall, the Holt–Winters additive model effectively captures both level and stable seasonality in the tourist arrival data, providing a smoother and more accurate short-term forecast.
+	
+
+#### 4.4.2 Residual Analysis — Holt–Winters Model
+
+```{r residual-analysis-HW}
+hw_residual <- residuals(forecast_hw)
+
+#plot residual
+plot(hw_residual, main = "Residuals from Holt Winter Model", ylab="Residuals", xlab = "Year")
+abline(h=0, col="red")
+```
+
+- The residuals are centered around zero, indicating that the model has no systematic over- or underestimation bias.
+- Most residuals within the range of ±20, suggesting stable forecast performance.
+- A few larger deviations (e.g., around 2003) indicate that the model did not fully capture certain short-term irregular shocks.
+- There is no visible repeating pattern or autocorrelation, implying that trend and seasonality have been effectively modeled.
+	
+
+```{r hw-residual-his}
+#histogram
+hist(hw_residual, main = "Histogram of Holt Winter model Residual", xlab="Residuals", col="lightblue", border="white")
+```
+
+- The residuals are mostly concentrated around zero, indicating that the model has captured the main trend and seasonality effectively.
+-	The distribution is slightly left-skewed, with a few larger negative residuals (around −40), suggesting that the model slightly underpredicted some observations.
+-	Most errors fall within the range of −20 to +20, implying limited variance and stable forecast performance.
+
+The residual histogram is approximately centered near zero with mild left skewness, confirming that the Holt–Winters model fits the data well overall but slightly underestimates a few low seasonal points.
+
+
+```{r hw-residual-fitted}
+# fitted fitted vs residuals
+plot(as.numeric(fitted(forecast_hw)), as.numeric(hw_residual),
+     main="Fitted vs Residuals (Holt Winter Model)",
+     xlab="Fitted Values", ylab="Residuals")
+abline(h=0, col="red")
+```
+
+Residuals are mostly concentrated within ±20, indicating that the model provides a close fit to the observed data. Only a few larger residuals appear when fitted values fall between 120 and 180, but no clear systematic pattern is present. This random scatter around zero suggests that the Holt–Winters model captures the main trend and seasonality effectively, with only minor localized errors.
+
+```{r hw-values-residuals}
+# real values vs residuals
+plot(as.numeric(arrivals_ts), as.numeric(hw_residual),
+     main = "Actual Values vs Residuals (Holt Winter Model)",
+     xlab = "Actual Values", ylab = "Residuals",
+     type = "p", pch = 19, col = "darkblue", cex= 0.8)
+abline(h = 0, col = "red")
+```
+
+Most points fall within ±20 residuals, indicating the model fits the data well. There are only a few (≈2–4) larger residuals when actual values are in the 100–200 range, but these are exceptions. Overall, the Holt–Winters model captures the bulk of the trend and seasonal structure with only minor localized errors.
+
+
+```{r hw-residual-ACF}
+#ACF plot of residuals
+Acf(hw_residual, main="ACF of Residuals - Holt Winter Forecast")
+```
+
+**ACF of Residuals**
+- The ACF plot of residuals shows that most autocorrelation values fall within the 95% confidence bands.  
+- This implies that residuals are **uncorrelated over time**, meeting the assumption of independence.  
+- It also suggests that the Holt–Winters model has adequately captured the serial dependence in the original time series.
+
+#### 4.4.3 Accuracy & Summary
+```{r hw-accuracy}
+accuracy(forecast_hw)
+forecast_hw
+plot(forecast_hw)
+```
+
+**Model Accuracy**
+The Holt-Winters additive model achieves the lowest **RMSE (13.82) and MAPE (≈7.6%)** among all tested models, indicating a strong fit and high short-term forecasting accuracy. The near-zero ME (0.03) suggests almost no systematic bias, while the small ACF1 (0.11) shows that residuals are largely uncorrelated — confirming the model effectively captures trend and seasonality.
+
+**Forecast for the Next Year**
+The model predicts tourist arrivals (in thousands) for next year as follows:
+| Quarter | Forecasted Value |
+|----------|------------------|
+| 2012 Q4 | **90.46** |
+| 2013 Q1 | **96.56** |
+| 2013 Q2 | **51.76** |
+| 2013 Q3 | **89.99** |
+
+The forecast results predict quarterly arrivals between ≈52,000 and 97,000, with the next-year average around 82,000–90,000 passengers. This aligns with the observed downward trend from previous years, suggesting a continued but stabilized low level of tourist arrivals after the earlier decline.
+
+**Additional Observations**
+- The **forecast pattern** maintains the seasonal oscillation observed historically, confirming that the model successfully captures recurring quarterly cycles.  
+- The **residual diagnostics** show no significant autocorrelation or bias, indicating a good model fit.  
+- Compared with SES, this model provides more realistic short-term dynamics because it simultaneously accounts for both **trend and seasonality**.
+
+**Summary:**  
+The Holt–Winters additive method delivers accurate, stable forecasts and effectively models both trend and seasonal variations,  
+making it one of the most suitable approaches for this quarterly tourism dataset.
+
+### 4.5 ARIMA
+```{r ts-armia}
+auto_fit <- auto.arima(arrivals_ts)
+attributes(auto_fit)
+forecast_arima = forecast(auto_fit,h = 5,level=c(99.5))
+
+forecast_arima$model
+```
+
+The automatic ARIMA procedure selected the following model: ARIMA(1,0,0)(0,1,1)[4] with drift
+
+#### 4.5.1 Residual
+```{r arima-residual}
+arima_residual <- residuals(forecast_arima)
+plot(arima_residual, main = "Residual of ARIMA", xlab = "Year")
+abline(h=0, col="red")
+```
+
+> Your residuals fluctuate around 0, which indicates that the model does not systematically over- or under-predict.
+> Residuals look like white noise: no visible trend or seasonality.
+> There are a few big residual spikes, especially around2003-2004 and 2009-2010, possible unexpected events there.
+
+```{r arima-his-residual}
+hist(arima_residual, main = "Histogram of ARIMA model Residual", xlab="Residuals", col="lightblue", border="white")
+
+```
+
+> The shape is roughly centered around zero
+> The distribution is fairly symmetric, although not perfectly.
+> No extremely heavy tails or skewness.
+
+```{r arima-fitted-residual}
+
+plot(as.numeric(fitted(forecast_arima)), as.numeric(arima_residual),
+     main = "Fitted and Residuals of ARIMA Model",
+     xlab = "Fitted Values",
+     ylab = "Residuals"
+     )
+abline(h=0, col= "red")
+```
+
+> No clear pattern
+> centered around zero
+> Constant variance
+> A few larger residuals appear isolated, may represent short term shocks
+
+```{r arima-realvalue-residuals}
+
+plot(as.numeric(arrivals_ts), as.numeric(arima_residual),
+     main = "Real Value vs Residuals of ARIMA",
+     xlab = "Real Values",
+     ylab = "Residuals"
+     )
+
+abline(h = 0, col= "red")
+```
+
+> Residuals randomly scattered around zero → model is unbiased
+> No visible pattern or shape → residuals do not depend on actual values
+> Variance is mostly stable across the range, though a few larger residuals appear near high values → acceptable for this dataset.
+
+
+```{r arima-residuals-ACF}
+
+Acf(arima_residual)
+```
+
+> Most spikes fall inside the bands, no significant remaining autocorrelation.
+> There is two slightly pike at Lags 6 and 17, but they're still close to the boundary
+> No repeating seasonal pattern and no obvous structure
+So overall, the ACF suggests that the ARIMA model has done a reasonable job: the residuals look mostly random, meaning the model has captured the trend and short-term correlation in the data.
+
+
+#### 4.5.2 Accuracy& Summary
+
+```{r arima-accuracy}
+accuracy(forecast_arima)
+
+plot(forecast_arima)
+```
+
+- ARIMA’s prediction error is about 7%, which is quite good for tourism forecasting. Anything below 10% is considered high accuracy.
+
+ARIMA achieves strong overall accuracy with low error rates (MAPE ~7%), no bias, and better performance than the naive benchmark, indicating a well-fitted model.
+
+### 4.6 Accuracy Summary
+
+```{r accuracy-summary}
+# Create accuracy comparison table
+model_comparison <- rbind(
+  naive = accuracy(arrival_naive),
+  ss = accuracy(ss_arrival),
+  ma = accuracy(forecast_ma6),
+  hw = accuracy(forecast_hw),
+  arima = accuracy(forecast_arima)
+)
+
+rownames(model_comparison) <- c( "Naive",  "SES", "Moving Average","Holt Winter", "ARIMA")
+round(model_comparison[, c("RMSE","MAE","MAPE","MASE")], 3)
+
+```
+
+**Best and Worst Models by Metric**
+
+| **Accuracy Measure** | **Best Model** | **Worst Model** | **Interpretation** |
+|------------------|----------------|-----------------|--------------------|
+| **MAPE** | **Moving Average** | Naïve | MA performs best on a scaled basis, far outperforming all others. |
+
+
+### 5. Summary Conclusion
+**Overall**
+- The analysis of Japan’s quarterly tourist arrivals (1996–2012) reveals a clear downward trend with strong and consistent seasonal patterns.
+- Tourist numbers typically peak twice a year — during winter holidays (Q1, Q4) and decline during mid-year (Q2–Q3).
+While earlier years showed stable fluctuations, arrivals declined notably after 2007, reflecting possible economic impacts or global events.
+
+**Based on the selected models and forecasts:**
+- **Next Year**: Based on the forecasting results, particularly from the Holt-Winters model, the series is expected to remain relatively stable with slight fluctuations over the next year, hovering around 90,000–95,000 arrivals per quarter.
+- **Next Two Years**: the model projects that arrivals will likely stay near current levels or decline slightly, showing no strong upward recovery trend in the short term.
+
+Overall, the time series demonstrates stabilization after a long-term decline, with seasonal peaks still present but less pronounced than in earlier years.
+Thus, the tourism demand is expected to stay relatively flat in the near future, maintaining moderate seasonal variation without significant growth momentum.
+
+
+
+
+
+
+

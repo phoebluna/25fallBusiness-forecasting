@@ -1,0 +1,209 @@
+---
+title: "MidtermPractice"
+author: "Lin Xiao"
+date: "2025-11-20"
+output: html_document
+---
+
+## 1. Import Data
+
+### Data Description
+
+The dataset arrivals (from the fpp2 package) contains **quarterly international tourist arrivals** to Australia from major source countries: Japan, New Zealand, the UK, and the US (1981–2012).
+
+- It includes one **time series** variable (`Japan arrivals`), measured four times per year (quarterly).  
+
+- The data were originally obtained from the *fpp2* package and are expressed in thousands of visitors.
+
+```{r ImportData}
+library(readr)
+library(fpp2)
+library(TTR)
+arrivals_data_csv <- read_csv("arrivals_quarterly.csv")
+head(arrivals_data_csv)
+
+spec(arrivals_data_csv)
+arrivals_ts_t <- ts(arrivals_data_csv$Japan, start=c(1981,1), frequency=4)
+
+head(arrivals_ts_t)
+tail(arrivals_ts_t)
+```
+
+## 2. Data Overview
+
+### 2.1 Time Series Plot
+```{r timeSeriesPlot}
+plot(arrivals_ts_t, ylab = "Japan Arrivals", col= "red")
+```
+
+### 2.2 Summary of time series plot Observations
+
+The time series of **Japan tourist arrivals (1981–2012)** shows several key characteristics:
+
+- **trend:** Strong growth up to ~1996, followed by a flattening/slight decline from the mid-to-late 1990s onward.
+
+- **Strong seasonality:** Regular quarterly peaks and troughs indicate recurring seasonal patterns, likely associated with holiday or vacation cycles.  
+
+- **Increasing variability:** The amplitude of seasonal swings increases over time (later years show larger ups and downs).
+
+Overall, the series demonstrates both trend and seasonality.
+However, since the recent portion of the series shows a different trend pattern — with a slight decline after 1996 — the data prior to 1996 were excluded to **retain only the more recent and relevant trend period** for modeling.
+
+### 2.3 Remove data plot and ACF plot 
+
+```{r acfPlot}
+arrivals_ts <- window(arrivals_ts_t, start = c(1996,1))
+
+plot(arrivals_ts)
+
+Acf(arrivals_ts)
+```
+
+### 2.4 Summary of ACF Plot Observations
+
+The **Autocorrelation Function (ACF)** plot for the Japan tourist arrivals time series shows the following characteristics:
+
+- **Strong positive autocorrelation at small lags**, gradually decreasing as lag increases.  
+  This pattern confirms the **presence of a long-term trend** in the data — consecutive observations are highly correlated.  
+- **Repeating spikes at lag multiples** indicate a **seasonal component** with a quarterly frequency.  
+  This aligns with the dataset’s quarterly nature and the seasonal peaks observed in the time series plot.  
+
+Overall, the ACF plot supports the earlier findings that the data exhibits both **trend** and **seasonality**
+
+### 2.5 Central Tendency
+
+```{r centralTendency}
+# Display summary statistics
+summary(arrivals_ts)
+
+# Create a box plot for visualizing distribution
+boxplot(arrivals_ts,
+        main = "Boxplot of Japan Tourist Arrivals (1996–2012)",
+        ylab = "Number of Arrivals (in thousands)",
+        col = "lightblue",
+        border = "darkblue")
+
+# box plot for visulizing distribution by year
+years  <- floor(time(arrivals_ts))
+values <- as.numeric(arrivals_ts)
+df <- data.frame(year = years, value = values)
+boxplot(value ~ year, data = df,
+        main = "Boxplots by Year",
+        xlab = "Year", ylab = "Arrivals (thousands)",
+        col = "lightblue", border = "gray40", outline = TRUE, las = 2, cex.axis = 0.7)
+
+```
+
+### 2.6 Summary of Statistics and Box Plot Observations
+
+- The summary statistics for the **Japan tourist arrivals (1981–2012)** show that arrivals ranged from 53.4 thousand to 227.6 thousand, with a mean of 152.9 thousand and a median of 165.8 thousand.
+
+- The interquartile range **(Q1–Q3 = 110.7–188.6)** indicates moderate variability, while the relatively close mean and median suggest that the data are approximately symmetric, with no strong skewness.
+
+- The boxplot indicates that most arrival values cluster around the median range, with only a few lower observations extending toward the bottom whisker, showing occasional **short-term declines**.
+
+- When viewed **by year**, the boxplots suggest that overall tourist arrivals gradually decreased over time, reflecting a general downward trend in inbound tourism from Japan during 1996–2012, while maintaining a consistent seasonal variation.
+
+Overall, the data illustrate **a slowly declining but still seasonally stable trend** in Japanese tourist arrivals during the period.
+
+## 3. Accuracy Evaluation Criteria
+
+For this dataset, MAPE (Mean Absolute Percentage Error) is selected as the primary accuracy metric.
+Since the goal is to forecast future tourist arrivals and communicate performance in interpretable terms, MAPE provides a clear percentage-based measure of average prediction error.
+The Japan tourist arrivals data consist of positive and stable values, making MAPE appropriate and reliable.
+
+## 4. Model
+
+### 4.1 ARIMA Model build
+```{r ts-armia}
+auto_fit <- auto.arima(arrivals_ts)
+attributes(auto_fit)
+forecast_arima = forecast(auto_fit,h = 5,level=c(99.5))
+
+forecast_arima$model
+```
+
+The automatic ARIMA procedure selected the following model: ARIMA(1,0,0)(0,1,1)[4] with drift
+
+### 4.2 Residual
+```{r arima-residual}
+arima_residual <- residuals(forecast_arima)
+plot(arima_residual, main = "Residual of ARIMA", xlab = "Year")
+abline(h=0, col="red")
+```
+
+> Your residuals fluctuate around 0, which indicates that the model does not systematically over- or under-predict.
+> Residuals look like white noise: no visible trend or seasonality.
+> There are a few big residual spikes, especially around2003-2004 and 2009-2010, possible unexpected events there.
+
+```{r arima-his-residual}
+hist(arima_residual, main = "Histogram of ARIMA model Residual", xlab="Residuals", col="lightblue", border="white")
+
+```
+
+> The shape is roughly centered around zero
+> The distribution is fairly symmetric, although not perfectly.
+> No extremely heavy tails or skewness.
+
+```{r arima-fitted-residual}
+
+plot(as.numeric(fitted(forecast_arima)), as.numeric(arima_residual),
+     main = "Fitted and Residuals of ARIMA Model",
+     xlab = "Fitted Values",
+     ylab = "Residuals"
+     )
+abline(h=0, col= "red")
+```
+
+> No clear pattern
+> centered around zero
+> Constant variance
+> A few larger residuals appear isolated, may represent short term shocks
+
+```{r arima-realvalue-residuals}
+
+plot(as.numeric(arrivals_ts), as.numeric(arima_residual),
+     main = "Real Value vs Residuals of ARIMA",
+     xlab = "Real Values",
+     ylab = "Residuals"
+     )
+
+abline(h = 0, col= "red")
+```
+
+> Residuals randomly scattered around zero → model is unbiased
+> No visible pattern or shape → residuals do not depend on actual values
+> Variance is mostly stable across the range, though a few larger residuals appear near high values → acceptable for this dataset.
+
+
+```{r arima-residuals-ACF}
+
+Acf(arima_residual)
+```
+
+> Most spikes fall inside the bands, no significant remaining autocorrelation.
+> There is two slightly pike at Lags 6 and 17, but they're still close to the boundary
+> No repeating seasonal pattern and no obvous structure
+So overall, the ACF suggests that the ARIMA model has done a reasonable job: the residuals look mostly random, meaning the model has captured the trend and short-term correlation in the data.
+
+
+### 4.3 Accuracy& Summary
+
+```{r arima-accuracy}
+accuracy(forecast_arima)
+
+plot(forecast_arima)
+```
+
+- ARIMA’s prediction error is about 7%, which is quite good for tourism forecasting. Anything below 10% is considered high accuracy.
+
+ARIMA achieves strong overall accuracy with low error rates (MAPE ~7%), no bias, and better performance than the naive benchmark, indicating a well-fitted model.
+
+
+
+
+
+
+
+
+
