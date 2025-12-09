@@ -8,65 +8,68 @@ output: html_document
 ## 1. Import Data
 
 ### Data Description
-
+The dataset is about unemployment data in the State of NY, and it contains **monthly** information. This project working on forecasting unemployment which helps understand the economic health of a region.
 
 ```{r ImportData}
 library(readr)
 library(fpp2)
 library(TTR)
-raw_data_csv <- read_csv("")
+raw_data_csv <- read_csv("Data_NewYorkEdited.csv")
 head(raw_data_csv)
 
 spec(raw_data_csv)
-ts_ <- ts(raw_data_csv$, start=c(1981,1), frequency=4)
+ts_unemployed <- ts(raw_data_csv$UnemployedLF, start=c(1976,1), end = c(2019,12), frequency=12)
 
-head(ts_)
-tail(ts_)
+head(ts_unemployed)
+tail(ts_unemployed)
 ```
 
 ## 2. Data Overview
 
 ### 2.1 Time Series Plot
 ```{r timeSeriesPlot}
-plot(ts_, ylab = "", col= "red")
-Acf(ts_)
+plot(ts_unemployed, ylab = "UnemployedLF", col= "red")
+Acf(ts_unemployed)
 ```
 
 ### 2.2 Summary of time series plot Observations
 
-The time series of **Japan tourist arrivals (1981–2012)** shows several key characteristics:
+The time series of **UnmploymentLF from Jan 1976 to Dec 2019** shows several key characteristics:
 
-- **trend:** 
+- **trend:** A gradual downward long-term trend, with unemployment levels decreasing toward the end of the series.
 
-- **Strong seasonality:** 
+- **Strong seasonality:** No clear seasonality is observed. Instead of seasonal repetition, the series exhibits multi-year cyclical movements.
 
-- **Increasing variability:** 
+- **Increasing variability:**Variability is not increasing over time; fluctuations remain relatively consistent, though cycles differ in amplitude across decades. 
 
-Overall, 
+Overall, the series displays pronounced long-term cycles and strong persistence, with slow ACF decay indicating long-range dependence rather than seasonal structure. 
 
 ### 2.3 Remove data plot and ACF plot 
 
+To generate short-term forecasts (1–2 years), a rolling window of recent data is preferred because the unemployment rate experienced structural changes over the full 40-year span. The period after 2010 is much more stable, with consistent downward movement and lower volatility. Using this window improves model stability and prevents earlier high-variance periods from distorting short-term forecasts.
+
 ```{r acfPlot}
-arrivals_ts <- window(ts_, start = c(1996,1))
+unemployed_ts <- window(ts_unemployed, start = c(2010,1))
 
-plot(arrivals_ts)
+plot(unemployed_ts, main = "Unemployment Level in Labor Force")
 
-Acf(arrivals_ts)
+Acf(unemployed_ts)
 ```
 
 ### 2.4 Summary of ACF Plot Observations
 
+The ACF shows very strong and persistent autocorrelation that decays slowly, indicating a non-stationary series with a strong underlying trend. There is no visible seasonal pattern, as correlations do not show repeating peaks at regular lags.
 
 ### 2.5 Central Tendency
 
 ```{r centralTendency}
 # Display summary statistics
-summary(arrivals_ts)
+summary(unemployed_ts)
 
 # Create a box plot for visualizing distribution
-boxplot(arrivals_ts,
-        main = "Boxplot of Japan Tourist Arrivals (1996–2012)",
-        ylab = "Number of Arrivals (in thousands)",
+boxplot(unemployed_ts,
+        main = "Boxplot of Unemployment (2010–2019)",
+        ylab = "unemployment(Percentage)",
         col = "lightblue",
         border = "darkblue")
 
@@ -75,13 +78,15 @@ boxplot(arrivals_ts,
 
 ### 2.6 Summary of Statistics and Box Plot Observations
 
+The unemployment rates from 2010–2019 range between 3.8 and 10.1, with a median around 6.25, indicating that half of the values fall between 4.5 and 9.1.
+The Boxplot shows a wide IQR, suggesting substantial variability across the decade, and no extreme outliers.
+Overall, the distribution indicates that unemployment was generally moderate but fluctuated significantly, consistent with the downward trend seen in the time series.
 
 
 ## 3. Accuracy Evaluation Criteria
 
 For this dataset, MAPE (Mean Absolute Percentage Error) is selected as the primary accuracy metric.
-Since the goal is to forecast future tourist arrivals and communicate performance in interpretable terms, MAPE provides a clear percentage-based measure of average prediction error.
-The Japan tourist arrivals data consist of positive and stable values, making MAPE appropriate and reliable.
+Since the goal is to forecast future unemployment rate and communicate performance in interpretable terms, MAPE provides a clear percentage-based measure of average prediction error.
 
 ## 4. Models
 
@@ -90,34 +95,33 @@ The Japan tourist arrivals data consist of positive and stable values, making MA
 
 ```{r decomposition}
 #decomposition
-stl_decomp <- stl(, s.window = "periodic")
+stl_decomp <- stl(unemployed_ts, s.window = "periodic")
 plot(stl_decomp)
 attributes(stl_decomp)
 
 ```
 
-- The seasonal component shows a **clear and stable quarterly pattern** throughout the entire period, confirming consistent seasonality in Japan’s tourist arrivals.
+- This additive decomposition shows a very strong and regular seasonal pattern, repeating every year with consitent peaks and troughs.
 
--  
+- Seasonal values range about +1 to –1, and High in Jan–Mar, low in Jun–Aug. May caused by early-year layoffs raise unemployment; summer hiring lowers it.
 
-> 
 
 ```{r decomposition-plot}
 # seasonal adjustment
 seasadj(stl_decomp)
 # Plot a line on the graph
-plot()
+plot(unemployed_ts)
 lines(seasadj(stl_decomp), col="Red")
 ```
 
-> 
+> After removing seasonality, the underlying downward trend becomes clearer, and seasonal fluctuations are moderate but noticeable. 
 
 
 ### 4.2 Naive Model
 
 ```{r Naive-model}
 # Model output
-forecast_naive <- naive(,4)
+forecast_naive <- naive(unemployed_ts,12)
 plot(forecast_naive, col= 'red')
 ```
 
@@ -134,8 +138,7 @@ plot(nv_residual, main="Residuals from Naïve Forecast", ylab="Residuals", xlab 
 abline(h=0, col="red")
 ```
 
-> The residuals are *centered* near zero (no major bias).
-> These patterns indicate that the Naïve method **fails** to fully account for the seasonal and trend components in the data.
+> The residuals from the naïve model show clear, repeated patterns rather than random noise, indicating the model is not capturing the underlying structure of the data. This happens because the naïve forecast ignores both trend and seasonality, leading to systematic over- and under-prediction.
 
 ```{r naive-residual_histogram}
 hist(nv_residual, main="Histogram of Naïve Forecast Residuals",
@@ -156,25 +159,24 @@ plot(as.numeric(fitted(forecast_naive)), as.numeric(nv_residual),
 abline(h = 0, col = "red")
 ```
 
-> Although the residuals are centered around zero, the distribution is not completely symmetric, indicating that the Naïve model does not fully capture the trend or seasonality.
-> There is no clear linear pattern, suggesting that there are no strong systematic errors and the residuals are largely random in value.
-> However, the residuals show considerable fluctuation, implying that the model’s forecasting accuracy is relatively low.
+> The residuals vs. fitted plot shows clear horizontal banding, meaning the errors cluster at specific levels instead of being randomly scattered. This confirms the naïve model fails to capture the structure of the data and leaves strong patterns in the residuals.
 
 ```{r naive-actual-vs-residuals}
-plot(as.numeric(forecast_naive),as.numeric(nv_residual),
+plot(as.numeric(unemployed_ts),as.numeric(nv_residual),
      main = "Actual Values vs Residuals (Naïve Model)",
      xlab = "Actual Values", ylab = "Residuals",
      type = "p", pch = 19, col = "darkblue", cex= 0.8)
+
 abline(h = 0, col = "red")
 ```
 
-> The “Actual vs Residuals” plot conveys a similar interpretation as the “Fitted vs Residuals” plot — the residuals are roughly centered around zero with no strong pattern, but the wide spread suggests the Naïve model does not fully capture the underlying structure of the time series.
+> The actual-vs-residuals plot again shows clear horizontal bands, meaning the residuals take only a few repeated values instead of forming a random cloud. This confirms that the naïve model leaves strong structure unexplained and is not capturing the true dynamics of the series.
 
 ```{r naive-acf}
 Acf(nv_residual, main="ACF of Residuals - Naïve Forecast")
 ```
 
-> The ACF plot of residuals shows significant autocorrelation at seasonal lags (e.g., 4, 8, 12), indicating that the Naïve model has not fully captured the underlying seasonal pattern in the time series. Therefore, the residuals are not white noise.
+> The ACF of the naïve model’s residuals shows strong autocorrelation at many lags, especially early lags, which stay well above the significance bounds. This indicates that the naïve model leaves substantial structure unmodeled, and the residuals are not white noise, confirming poor fit.
 
 #### 4.2.2 Accuracy & Conclusion
 ```{r naive-accuracy}
@@ -182,30 +184,28 @@ accuracy(forecast_naive)
 forecast_naive$mean
 autoplot(forecast_naive) +
   ggtitle("Naïve Forecast") +
-  ylab("") +
-  xlab("") +
+  ylab("Unemployment(Percentage)") +
+  xlab("Year") +
   theme_minimal()
 ```
 	
- **Accuracy**
+**Accuracy:**
+The naïve model performs poorly — its MAPE is about 1.26, meaning it has large relative errors, and the ACF1 value of 0.56 shows strong autocorrelation in residuals (a bad sign). This indicates the model does not capture trend or seasonality.
 
-
- **Interpretation**
-  
-
- **Conclusion**
+**What it predicts:**
+The naïve model simply predicts that next month’s unemployment rate will be equal to the current month’s rate, offering no meaningful insight beyond repeating the last observed value.
 
 
 ### 4.3 Moving Averages
 
 ```{r MA-model}
 # Compute moving averages of different orders
-MA3_forecast <- ma(, order = 3)
-MA6_forecast <- ma(, order = 6)
-MA9_forecast <- ma(, order = 9)
+MA3_forecast <- ma(unemployed_ts, order = 3)
+MA6_forecast <- ma(unemployed_ts, order = 6)
+MA9_forecast <- ma(unemployed_ts, order = 9)
 
 # Plot original time series
-plot(, main = "Simple Moving Averages (Orders 3, 6, 9)",
+plot(unemployed_ts, main = "Simple Moving Averages (Orders 3, 6, 9)",
      ylab = "Tourist Arrivals (Thousands)", xlab = "Year", col = "black")
 
 # Add the three moving averages
@@ -215,7 +215,7 @@ lines(MA9_forecast, col = "green", lwd = 2)
 
 # Forecast next 4 quarters using order 6 (bonus)
 fit_ma6 <- auto.arima(na.omit(MA6_forecast))
-forecast_ma6 <- forecast(fit_ma6, h = 4)
+forecast_ma6 <- forecast(fit_ma6, h = 12)
 lines(forecast_ma6$mean, col = "purple", lwd = 2)
 
 legend("bottomleft",
@@ -232,25 +232,18 @@ legend("bottomleft",
 - The **MA(3)** line (red) still follows most of the short-term fluctuations.  
 - The **MA(6)** line (blue) reduces seasonal noise and captures medium-term trends better.  
 - The **MA(9)** line (green) is the smoothest, showing the long-term movement but lagging behind actual changes.  
-- Using MA(6), the forecast for the next 4 quarters predicts stable arrivals with mild variations.
+- Using MA(6), the forecast for the next next 12 month predicts stable arrivals with mild variations.
 
 Overall, increasing the order of the moving average reduces short-term noise but delays response to sudden changes in the data.
 
 ### 4.3 Simple Smoothing
 ```{r simple-smooting-model}
-ss_forecast <- ses(, h = 4)
+ss_forecast <- ses(unemployed_ts, h = 12)
 plot(ss_forecast)
 ss_forecast$model
 ```
 
-**Model Parameters**
-- **Alpha (α) = ** 
-
-- **The initial level (≈)**  arrivals.  
-
-- **The estimated sigma of ** 
-
-Overall,
+> The SES model behaves almost like a naïve model because α is extremely close to 1, meaning it heavily tracks the latest value and does not smooth much of the past. This makes SES less suitable for your data, which has a clear long-term downward trend and seasonal structure.
 
 #### 4.3.1 Residual Analysis
 
@@ -260,18 +253,15 @@ plot(ss_residual, main="Residuals from Simple Smoothing Forecast", ylab="Residua
 abline(h=0, col="red")
 ```
 
-> The residuals fluctuate around zero, indicating no systematic bias in the model.
-> However, the repeating peaks and troughs suggest that some seasonal pattern remains in the residuals — meaning the Simple Exponential Smoothing model has not captured the seasonality in the data.
+> The SES residuals show clear patterns rather than random noise, indicating the model fails to capture important structure in the data. The residuals also exhibit clustered positive and negative runs, confirming SES is not fitting the trend or seasonality well.
 
 ```{r SS-residual-histogram}
 hist(ss_residual, main = "Histogram of SS model Residual", xlab="Residuals", col="lightblue", border="white")
 ```
 
 **Observations:**
-- The residuals are approximately **centered around zero**, indicating that the SES model does not exhibit a consistent bias in over- or underestimation.
-- The distribution is **left-skewed**, with a few large negative residuals extending to around −80, while the right tail is relatively short (up to about +35).
-- Most residuals lie between −60 and +20, indicating a moderate spread around the mean.
-
+- The SES residual histogram is roughly centered around zero, showing no clear systematic bias.
+- However, the distribution is skewed and not symmetric, confirming that SES does not fully capture the structure in the data.
 
 ```{r SS-residual-vs-fitted}
 
@@ -282,13 +272,12 @@ abline(h=0, col="red")
 ```
 
 **Observations:**
--The residuals are generally centered around zero, but the scatter shows a concentration of points at both ends of the fitted value range (around 90 and 200).
-- A few large negative residuals (around −60) indicate notable overpredictions in some periods.
-- The middle range of fitted values (120–160) contains fewer points, suggesting less variation in that range.
+- The residuals vs. fitted plot shows that the points form clear horizontal bands rather than a random cloud.
+- This indicates systematic patterns remain, meaning the SES model still fails to capture important structure in the data.
 
 
 ```{r SS-actual-vs-residuals}
-plot(as.numeric(), as.numeric(ss_residual),
+plot(as.numeric(unemployed_ts), as.numeric(ss_residual),
      main = "Actual Values vs Residuals (SS Model)",
      xlab = "Actual Values", ylab = "Residuals",
      type = "p", pch = 19, col = "darkblue", cex= 0.8)
@@ -296,15 +285,16 @@ abline(h = 0, col = "red")
 ```
 
 
-> The residuals show a clear pattern: large negative values at low actuals and positive clustering at high actuals, indicating that the SES model tends to overestimate during low-demand periods and underestimate during high-demand periods, suggesting it does not fully capture the scale of variation in the data.
+> The residuals vs. actual values plot shows clear horizontal clustering, meaning the SES model produces repeated residual patterns rather than random noise.
+> This indicates the model still fails to capture key structure in the data, so the fit remains inadequate.
 
 
 ```{r ss-acf}
 Acf(ss_residual, main="ACF of Residuals - SS Forecast")
 ```
 
-> The ACF plot of residuals still shows significant spikes at seasonal lags (for example, around lag 4, 8, 12, etc.), indicating that seasonal correlation remains in the residuals.
-> This means that the Simple Smoothing (SS) model — which only captures the level of the time series — did not adequately model the seasonal structure present in the data.
+> The ACF plot shows strong positive autocorrelation at many early lags, meaning the residuals are not behaving like white noise.
+> This confirms that the SES model misses important structure in the data and is not an adequate forecasting model.
 
 #### 4.3.2 Accuracy & summary
 
@@ -314,26 +304,22 @@ ss_forecast
 plot(ss_forecast)
 ```
 
-- MAPE = 15.86% suggests the forecasts deviate from actual values by about 16% on average, which is acceptable but not highly accurate for short-term forecasting.
-
-The SES model produces reasonable accuracy with a mild underestimation bias and no major residual autocorrelation, but the 15% MAPE indicates limited short-term precision due to its inability to model trend or seasonality.
+- The SES model performs very well, with a MAPE of about 1.25%, showing highly accurate short-term predictions. It forecasts the series to stay near 3.99999 over the next year, reflecting a stable level with no trend or seasonality. The positive ACF1 indicates some remaining structure that SES does not fully capture.
 
 
 ### 4.4 Holt-Winters
 
 #### 4.4.1 Holt Winters Model perform
 ```{r holt-winter-model}
-hw_forecast <- hw()
-forecast_hw <- forecast(hw_forecast, h = 4)
+hw_forecast <- hw(unemployed_ts)
+forecast_hw <- forecast(hw_forecast, h = 12)
 forecast_hw$model
 ```
 
-- α (alpha) = 0.4588 → 
-- β (beta) ≈ 0 → 
-- γ (gamma) ≈ 0 → 
-- σ (sigma) = 14.73 → 
-	
-Overall, 
+- α (alpha) = 0.7758 → The model places substantial weight on recent observations when updating the level.
+- β (beta) ≈ 0.164 → The trend component is updated gradually, indicating a relatively stable downward trend.
+- γ (gamma) ≈ 1e-04  → The seasonal pattern is very stable over time, with almost no change from year to year.
+- σ (sigma) = 0.0898 → Indicates relatively low residual variability.
 	
 
 #### 4.4.2 Residual Analysis — Holt–Winters Model
@@ -347,8 +333,8 @@ abline(h=0, col="red")
 ```
 
 - The residuals are centered around zero, indicating that the model has no systematic over- or underestimation bias.
-- Most residuals within the range of ±20, suggesting stable forecast performance.
-- A few larger deviations (e.g., around 2003) indicate that the model did not fully capture certain short-term irregular shocks.
+- Most residuals within the range of ±0.2, suggesting stable forecast performance.
+- A few larger deviations (e.g., around 2017 and 2015) indicate that the model did not fully capture certain short-term irregular shocks.
 - There is no visible repeating pattern or autocorrelation, implying that trend and seasonality have been effectively modeled.
 	
 
@@ -358,10 +344,10 @@ hist(hw_residual, main = "Histogram of Holt Winter model Residual", xlab="Residu
 ```
 
 - The residuals are mostly concentrated around zero, indicating that the model has captured the main trend and seasonality effectively.
--	The distribution is slightly left-skewed, with a few larger negative residuals (around −40), suggesting that the model slightly underpredicted some observations.
--	Most errors fall within the range of −20 to +20, implying limited variance and stable forecast performance.
+-	The distribution is slightly right-skewed, with a few larger negative residuals (around −0.2), suggesting that the model slightly underpredicted some observations.
+-	Most errors fall within the range of −0.2 to +0.2, implying limited variance and stable forecast performance.
 
-The residual histogram is approximately centered near zero with mild left skewness, confirming that the Holt–Winters model fits the data well overall but slightly underestimates a few low seasonal points.
+The residual histogram is approximately centered near zero with mild right skewness, confirming that the Holt–Winters model fits the data well overall but slightly underestimates a few low seasonal points.
 
 
 ```{r hw-residual-fitted}
@@ -372,18 +358,22 @@ plot(as.numeric(fitted(forecast_hw)), as.numeric(hw_residual),
 abline(h=0, col="red")
 ```
 
-Residuals are mostly concentrated within ±20, indicating that the model provides a close fit to the observed data. Only a few larger residuals appear when fitted values fall between 120 and 180, but no clear systematic pattern is present. This random scatter around zero suggests that the Holt–Winters model captures the main trend and seasonality effectively, with only minor localized errors.
+> Residuals are mostly concentrated within ±0.2, indicating that the model provides a close fit to the observed data. 
+> Only a few larger residuals appear when fitted values fall between 5 and 6, but no clear systematic pattern is present. 
+> This random scatter around zero suggests that the Holt–Winters model captures the main trend and seasonality effectively, with only minor localized errors.
 
 ```{r hw-values-residuals}
 # real values vs residuals
-plot(as.numeric(), as.numeric(hw_residual),
+plot(as.numeric(unemployed_ts), as.numeric(hw_residual),
      main = "Actual Values vs Residuals (Holt Winter Model)",
      xlab = "Actual Values", ylab = "Residuals",
      type = "p", pch = 19, col = "darkblue", cex= 0.8)
 abline(h = 0, col = "red")
 ```
 
-Most points fall within ±20 residuals, indicating the model fits the data well. There are only a few (≈2–4) larger residuals when actual values are in the 100–200 range, but these are exceptions. Overall, the Holt–Winters model captures the bulk of the trend and seasonal structure with only minor localized errors.
+> Most points fall within ±0.2 residuals, indicating the model fits the data well. 
+> There are only a few (≈2) larger residuals when actual values are in the 5–6 range, but these are exceptions. 
+> Overall, the Holt–Winters model captures the bulk of the trend and seasonal structure with only minor localized errors.
 
 
 ```{r hw-residual-ACF}
@@ -392,9 +382,9 @@ Acf(hw_residual, main="ACF of Residuals - Holt Winter Forecast")
 ```
 
 **ACF of Residuals**
-- The ACF plot of residuals shows that most autocorrelation values fall within the 95% confidence bands.  
-- This implies that residuals are **uncorrelated over time**, meeting the assumption of independence.  
-- It also suggests that the Holt–Winters model has adequately captured the serial dependence in the original time series.
+
+- Most ACF spikes fall within the 95% confidence bands, indicating the Holt–Winters model captures most of the serial dependence in the data. 
+- However, a few early-lag spikes still exceed the bands, showing that some structure remains unexplained and the residuals are not perfectly white noise.
 
 #### 4.4.3 Accuracy & Summary
 ```{r hw-accuracy}
@@ -404,33 +394,26 @@ plot(forecast_hw)
 ```
 
 **Model Accuracy**
-
+The Holt–Winters additive model provides strong accuracy, with a very low MAPE of about 1.19%, indicating that forecast errors are small on average and the model captures both trend and seasonality well.
 
 **Forecast for the Next Year**
-The model predicts tourist arrivals (in thousands) for next year as follows:
-| Quarter | Forecasted Value |
-|----------|------------------|
-| 2012 Q4 | **90.46** |
-| 2013 Q1 | **96.56** |
-| 2013 Q2 | **51.76** |
-| 2013 Q3 | **89.99** |
+It predicts that unemployment will remain stable over the next year, with point forecasts mostly between 3.94 and 4.05 throughout 2020, showing a slight upward drift but no major changes.
 
-The forecast results predict quarterly arrivals between ≈52,000 and 97,000, with the next-year average around 82,000–90,000 passengers. This aligns with the observed downward trend from previous years, suggesting a continued but stabilized low level of tourist arrivals after the earlier decline.
-
-**Summary:**  
-The Holt–Winters additive method delivers accurate, stable forecasts and effectively models both trend and seasonal variations,  
-making it one of the most suitable approaches for this quarterly tourism dataset.
+Overall, the model fits the data well, handles seasonal patterns effectively, and produces smooth, realistic forecasts with narrow confidence intervals.
 
 ### 4.5 ARIMA
 ```{r ts-armia}
-auto_fit <- auto.arima()
+auto_fit <- auto.arima(unemployed_ts)
 attributes(auto_fit)
-forecast_arima = forecast(auto_fit,h = 5,level=c(99.5))
+forecast_arima = forecast(auto_fit,h = 12,level=c(99.5))
 
 forecast_arima$model
 ```
 
-The automatic ARIMA procedure selected the following model: ARIMA(1,0,0)(0,1,1)[4] with drift
+
+The automatic ARIMA procedure selected an ARIMA(3,1,0)(2,0,0)12 with drift, meaning the model captures short-term AR structure, a seasonal AR component, and an overall downward trend through differencing and drift. The estimated parameters (ar1 = 0.3529, ar2 = 0.5959, ar3 = –0.2016, sar1 = –0.0679, sar2 = –0.0312) and the small estimated variance (σ² ≈ 0.0036) indicate a stable model fit.
+
+Overall, the model is well-specified for capturing both trend and annual seasonality, and it provides a strong statistical foundation for producing year-ahead forecasts.
 
 #### 4.5.1 Residual
 ```{r arima-residual}
@@ -441,7 +424,7 @@ abline(h=0, col="red")
 
 > Your residuals fluctuate around 0, which indicates that the model does not systematically over- or under-predict.
 > Residuals look like white noise: no visible trend or seasonality.
-> There are a few big residual spikes, especially around2003-2004 and 2009-2010, possible unexpected events there.
+> There are a few big residual spikes, especially around late 2013 and late 2016, possible unexpected events there.
 
 ```{r arima-his-residual}
 hist(arima_residual, main = "Histogram of ARIMA model Residual", xlab="Residuals", col="lightblue", border="white")
@@ -462,14 +445,11 @@ plot(as.numeric(fitted(forecast_arima)), as.numeric(arima_residual),
 abline(h=0, col= "red")
 ```
 
-> No clear pattern
-> centered around zero
-> Constant variance
-> A few larger residuals appear isolated, may represent short term shocks
+> The residuals appear randomly scattered around zero with no clear pattern, suggesting the ARIMA model captures most of the underlying structure in the data. > However, slight clustering at higher fitted values indicates some remaining seasonality or nonlinear effects that the ARIMA model does not fully explain.
 
 ```{r arima-realvalue-residuals}
 
-plot(as.numeric(), as.numeric(arima_residual),
+plot(as.numeric(unemployed_ts), as.numeric(arima_residual),
      main = "Real Value vs Residuals of ARIMA",
      xlab = "Real Values",
      ylab = "Residuals"
@@ -478,9 +458,8 @@ plot(as.numeric(), as.numeric(arima_residual),
 abline(h = 0, col= "red")
 ```
 
-> Residuals randomly scattered around zero → model is unbiased
-> No visible pattern or shape → residuals do not depend on actual values
-> Variance is mostly stable across the range, though a few larger residuals appear near high values → acceptable for this dataset.
+> The residuals show no clear pattern across the range of actual unemployment values, suggesting the ARIMA model does not systematically over- or under-predict at specific levels. 
+> A small cluster of points at higher actual values hints at slight remaining structure, but overall the residuals behave reasonably randomly around zero.
 
 
 ```{r arima-residuals-ACF}
@@ -488,8 +467,7 @@ abline(h = 0, col= "red")
 Acf(arima_residual)
 ```
 
-> Most spikes fall inside the bands, no significant remaining autocorrelation.
-> There is two slightly pike at Lags 6 and 17, but they're still close to the boundary
+> All spikes fall inside the bands, no significant remaining autocorrelation.
 > No repeating seasonal pattern and no obvous structure
 So overall, the ACF suggests that the ARIMA model has done a reasonable job: the residuals look mostly random, meaning the model has captured the trend and short-term correlation in the data.
 
@@ -498,21 +476,25 @@ So overall, the ACF suggests that the ARIMA model has done a reasonable job: the
 
 ```{r arima-accuracy}
 accuracy(forecast_arima)
+forecast_arima
+plot(forecast_arima, main = "Unemployment Next Year from ARIMA")
 
-plot(forecast_arima)
+forecast_arima_N2 = forecast(auto_fit,h = 24,level=c(99.5))
+plot(forecast_arima_N2, main = "Unemployment Next Two Year from ARIMA")
 ```
 
-- ARIMA’s prediction error is about 7%, which is quite good for tourism forecasting. Anything below 10% is considered high accuracy.
+- ARIMA’s prediction error is about 0.79%, which is quite good for unemployment forecasting.
+- The model forecasts unemployment to stay stable around 3.7–4.2% throughout 2020. This reflects a continuation of the recent stable trend.
 
-ARIMA achieves strong overall accuracy with low error rates (MAPE ~7%), no bias, and better performance than the naive benchmark, indicating a well-fitted model.
+ARIMA achieves strong overall accuracy with low error rates (MAPE 0.79%), no bias, and better performance than the naive benchmark, indicating a well-fitted model.
 
-### 4.6 Accuracy Summary
+### 5. Accuracy Summary
 
 ```{r accuracy-summary}
 # Create accuracy comparison table
 model_comparison <- rbind(
-  naive = accuracy(),
-  ss = accuracy(),
+  naive = accuracy(forecast_naive),
+  ss = accuracy(ss_forecast),
   ma = accuracy(forecast_ma6),
   hw = accuracy(forecast_hw),
   arima = accuracy(forecast_arima)
@@ -530,18 +512,53 @@ round(model_comparison[, c("RMSE","MAE","MAPE","MASE")], 3)
 | **MAPE** | **Moving Average** | Naïve | MA performs best on a scaled basis, far outperforming all others. |
 
 
-### 5. Summary Conclusion
+### 6. Forcast without windows using ARIMA
+```{r forcast_arima_wholeset}
+auto_fit2 <- auto.arima(ts_unemployed)
+attributes(auto_fit2)
+forecast_arima2 = forecast(auto_fit2,h = 12,level=c(99.5))
+plot(forecast_arima2, main = "Unemployment Next Year from ARIMA without windowing")
+
+accuracy(forecast_arima2)
+forecast_arima2
+
+forecast_arima_N2_2 = forecast(auto_fit2,h = 24,level=c(99.5))
+forecast_arima_N2_2
+plot(forecast_arima_N2_2, main = "Unemployment Next Two Year from ARIMA without windowing")
+```
+
+**ARIMA Forecasting Using the Full Historical Series — Summary Analysis**
+
+- Model used -ARIMA(3,1,0)(2,0,0)[12] with drift
+  -	Non-seasonal AR(3) and differencing of order 1
+  - Seasonal AR(2) with yearly seasonality (period = 12)
+  - A drift term, capturing long-term trend
+  - This model explicitly picks up both trend + seasonal cycles across the entire 1970–2020 range.
+
+- MAPE ~ 0.76% → extremely accurate (sub-1% error is unusually strong for macro data)
+
+- Forecast Interpretation (Next 1–2 Years)
+> Next Year: 4.09->4.69 a slight increase
+> Next Two Year: 4.09 - 4.8 Signaling a continued but moderate upward trend.
+
+Overall:
+The full-sample ARIMA model suggests unemployment has reached a cyclical bottom and is now expected to rise gradually over the next two years.
+However, although the full-sample ARIMA model is statistically accurate, it mixes multiple historical economic regimes and overweights old high-unemployment periods. This leads to biased and less realistic forecasts for today’s labor market. A recent data window better reflects current structural conditions and produces more relevant short-term predictions.
+
+### 7. Summary Conclusion
 **Overall**
-- 
+-In the most recent years, the unemployment rate becomes much more stable, fluctuating within a narrow band around 3.8–4.2% with very consistent seasonality. There is no strong upward or downward trend, and variability is lower than earlier decades, making the series highly predictable in the short term.
 
 **Based on the selected models and forecasts:**
-- **Next Year**: 
-- **Next Two Years**: 
-
-Overall, 
+- **Next Year**: Both Holt–Winters and ARIMA predict unemployment will remain stable around 3.8–4.2%, with only minor month-to-month fluctuations and no major upward or downward shifts.
+- **Next Two Years**: The models collectively indicate continued stability, with values likely holding in the 3.7–4.3% range, suggesting no significant structural changes in the unemployment trend.
 
 **Rank Model**
-
+  1. Moving Average-  Best accuracy (lowest MAPE).
+	2. ARIMA – Highest accuracy, balanced fit, reliable residuals
+	3. Holt–Winters Additive – Strong seasonal modeling, good accuracy
+	4. Simple Exponential Smoothing (SES) – Reasonable but lacks seasonal structure
+	5. Naïve Model – Weakest; fails to capture trend or seasonality
 
 
 
